@@ -20,7 +20,6 @@ const Bro = struct {
 };
 
 pub fn main() !void {
-    // Предположим, что у нас есть набор байтов
     const bytes = [_]u8{
         0x00,
         0x01,
@@ -38,7 +37,7 @@ pub fn main() !void {
         0x02,
         0x00,
         0x03,
-    }; // Пример байтов
+    };
 
     const bro = Bro{
         .key = "bro",
@@ -47,10 +46,8 @@ pub fn main() !void {
     const buf = bytesUtil.packBytes(Bro, bro);
     std.debug.print("{any}", .{buf});
 
-    // Использование функции для распаковки байтов в структуру
     const myStruct = bytesUtil.unpackBytes(Auth, &bytes);
 
-    // Вывод результатов
     std.debug.print("field1: {any}\n", .{myStruct.is_cheat});
 
     const allocator = std.heap.page_allocator;
