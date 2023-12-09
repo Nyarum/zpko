@@ -69,10 +69,11 @@ pub fn main() !void {
 
         std.debug.print("New connection: {}\n", .{connection.address});
 
-        _ = std.Thread.spawn(.{}, handleConnection, .{connection}) catch |err| {
+        const thread = std.Thread.spawn(.{}, handleConnection, .{connection}) catch |err| {
             std.log.err("can't spawn {any}", .{err});
             continue;
         };
+        thread.detach();
 
         const firstDate = bytesUtil.packHeaderBytes(940, time);
         const size = try connection.stream.write(firstDate);
