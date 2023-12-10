@@ -7,6 +7,7 @@ const uuid = @import("./uuid.zig");
 const print = std.debug.print;
 
 const Auth = struct {
+    opcode: ?u16 = 431,
     key: []const u8,
     login: []const u8,
     password: []const u8,

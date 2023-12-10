@@ -1,37 +1,52 @@
 const std = @import("std");
 const print = std.debug.print;
 
+fn isFieldOptional(comptime T: type, field_index: usize) !bool {
+    const fields = @typeInfo(T).Struct.fields;
+    return switch (field_index) {
+        // This prong is analyzed `fields.len - 1` times with `idx` being a
+        // unique comptime-known value each time.
+        inline 0...fields.len - 1 => |idx| @typeInfo(fields[idx].type) == .Optional,
+        else => return error.IndexOutOfBounds,
+    };
+}
+
 pub fn unpackBytes(comptime T: type, bytes: []const u8) T {
     var result: T = undefined;
     var modBuf = bytes;
+    const fields = std.meta.fields(T);
 
-    result.bro();
+    inline for (fields, 0..fields.len) |field, index| {
+        const isOptional: bool = isFieldOptional(T, index) catch {
+            break;
+        };
 
-    inline for (std.meta.fields(T)) |field| {
-        switch (field.type) {
-            u8 => {
-                const takeBuf = modBuf[0..1];
-                modBuf = modBuf[1..];
-                @field(result, field.name) = takeBuf[0];
-            },
-            u16 => {
-                const takeBuf = modBuf[0..2];
-                modBuf = modBuf[2..];
-                const v = std.mem.readInt(u16, takeBuf, std.builtin.Endian.big);
-                @field(result, field.name) = v;
-            },
-            []const u8 => {
-                const takeBuf = modBuf[0..2];
-                modBuf = modBuf[2..];
-                const lnStr = std.mem.readInt(u16, takeBuf, std.builtin.Endian.big);
+        if (!isOptional) {
+            switch (field.type) {
+                u8 => {
+                    const takeBuf = modBuf[0..1];
+                    modBuf = modBuf[1..];
+                    @field(result, field.name) = takeBuf[0];
+                },
+                u16 => {
+                    const takeBuf = modBuf[0..2];
+                    modBuf = modBuf[2..];
+                    const v = std.mem.readInt(u16, takeBuf, std.builtin.Endian.big);
+                    @field(result, field.name) = v;
+                },
+                []const u8 => {
+                    const takeBuf = modBuf[0..2];
+                    modBuf = modBuf[2..];
+                    const lnStr = std.mem.readInt(u16, takeBuf, std.builtin.Endian.big);
 
-                const str = modBuf[0..lnStr];
-                modBuf = modBuf[lnStr..];
-                @field(result, field.name) = str;
-            },
-            else => {
-                std.log.info("I don't know", .{});
-            },
+                    const str = modBuf[0..lnStr];
+                    modBuf = modBuf[lnStr..];
+                    @field(result, field.name) = str;
+                },
+                else => {
+                    std.log.info("I don't know", .{});
+                },
+            }
         }
     }
 
