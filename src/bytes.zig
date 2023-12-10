@@ -5,6 +5,8 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) T {
     var result: T = undefined;
     var modBuf = bytes;
 
+    result.bro();
+
     inline for (std.meta.fields(T)) |field| {
         switch (field.type) {
             u8 => {

@@ -3,6 +3,7 @@ const net = std.net;
 const Allocator = std.mem.Allocator;
 const timeUtil = @import("./time.zig");
 const bytesUtil = @import("./bytes.zig");
+const uuid = @import("./uuid.zig");
 const print = std.debug.print;
 
 const Auth = struct {
@@ -12,6 +13,10 @@ const Auth = struct {
     mac: []const u8,
     is_cheat: u16,
     client_version: u16,
+
+    pub fn bro(_: Auth) void {
+        print("test", .{});
+    }
 };
 
 const Bro = struct {
@@ -20,6 +25,8 @@ const Bro = struct {
 };
 
 pub fn main() !void {
+    print("{s}\n", .{uuid.UUID4.generate()});
+
     const bytes = [_]u8{
         0x00,
         0x01,

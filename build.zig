@@ -24,6 +24,14 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    exe.linkLibC();
+    exe.addIncludePath(.{ .path = "libs/uuid4/src" });
+    exe.addCSourceFile(.{ .file = .{ .path = "libs/uuid4/src/uuid4.c" }, .flags = &.{
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    } });
+
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
