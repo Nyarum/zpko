@@ -1,5 +1,6 @@
 const std = @import("std");
 const print = std.debug.print;
+const custom_types = @import("./types.zig");
 
 fn isFieldOptional(comptime T: type, field_index: usize) !bool {
     const fields = @typeInfo(T).Struct.fields;
@@ -74,8 +75,14 @@ pub fn packBytes(comptime T: type, v: T) []const u8 {
             },
             []const u8 => {
                 const v2 = @field(v, field.name);
-                std.mem.copyForwards(u8, buf[offset .. offset + v2.len], v2);
+                @memcpy(buf[offset .. offset + v2.len], v2[0..v2.len]);
                 finalOffset = offset + @as(u8, @intCast(v2.len));
+            },
+            custom_types.plain_string => {
+                const v2 = @field(v, field.name);
+                const value = v2.value;
+                @memcpy(buf[offset .. offset + value.len], value[0..value.len]);
+                finalOffset = offset + @as(u8, @intCast(value.len));
             },
             else => {
                 std.log.info("I don't know", .{});
@@ -86,14 +93,16 @@ pub fn packBytes(comptime T: type, v: T) []const u8 {
     return buf[0..finalOffset];
 }
 
-pub fn packHeaderBytes(opcode: u16, buf: []const u8) []const u8 {
+pub fn packHeaderBytes(comptime T: type, v: T) []const u8 {
+    const buf = packBytes(T, v);
     const len = buf.len + 8;
+    const opcode = v.opcode.?;
 
     var lenBuf: [4096]u8 = undefined;
     std.mem.writeInt(u16, lenBuf[0..2], @as(u16, @intCast(len)), std.builtin.Endian.big);
     std.mem.writeInt(u32, lenBuf[2..6], 0x80, std.builtin.Endian.little);
     std.mem.writeInt(u16, lenBuf[6..8], opcode, std.builtin.Endian.big);
-    std.mem.copyForwards(u8, lenBuf[8..len], buf[0..]);
+    @memcpy(lenBuf[8..len], buf[0..]);
 
     std.log.info("{x:0>2}", .{std.fmt.fmtSliceHexUpper(lenBuf[0..len])});
 

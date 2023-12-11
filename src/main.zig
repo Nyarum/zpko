@@ -4,6 +4,8 @@ const Allocator = std.mem.Allocator;
 const timeUtil = @import("./time.zig");
 const bytesUtil = @import("./bytes.zig");
 const uuid = @import("./uuid.zig");
+const storage = @import("./storage.zig");
+const packets = @import("./packets.zig");
 const print = std.debug.print;
 
 const Auth = struct {
@@ -60,17 +62,18 @@ pub fn main() !void {
 
     const allocator = std.heap.page_allocator;
 
+    const stor = storage.Storage.init(allocator);
+    _ = stor;
+
     var server = net.StreamServer.init(.{});
     defer server.deinit();
 
     try server.listen(try net.Address.parseIp4("127.0.0.1", 1973));
 
-    const time = try timeUtil.getCurrentTime(allocator);
-
-    std.debug.print("{s}\n", .{time});
-
     while (true) {
         const connection = try server.accept();
+
+        const timePkt = try packets.CharacterScreen.firstDate.init(allocator);
 
         std.debug.print("New connection: {}\n", .{connection.address});
 
@@ -80,8 +83,9 @@ pub fn main() !void {
         };
         thread.detach();
 
-        const firstDate = bytesUtil.packHeaderBytes(940, time);
-        const size = try connection.stream.write(firstDate);
+        const size = try connection.stream.write(
+            bytesUtil.packHeaderBytes(packets.CharacterScreen.firstDate, timePkt),
+        );
         _ = size;
     }
 }
@@ -117,8 +121,10 @@ fn handleConnection(conn: net.StreamServer.Connection) void {
 
         if (std.mem.eql(u8, buf[6..8], &[_]u8{ 0x01, 0xAF })) {
             const authEnter = bytesUtil.packHeaderBytes(
-                931,
-                &[_]u8{ 0x00, 0x00, 0x00, 0x08, 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x32, 0x14 },
+                packets.Undefined2,
+                packets.Undefined2{
+                    .data = &[_]u8{ 0x00, 0x00, 0x00, 0x08, 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x32, 0x14 },
+                },
             );
 
             _ = conn.stream.write(authEnter) catch {
