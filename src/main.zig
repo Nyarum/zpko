@@ -37,6 +37,10 @@ const Bro = struct {
     key: []const u8,
 };
 
+fn gras() void {
+    print("hey", .{});
+}
+
 pub fn main() !void {
     var ring = try io_uring.init(MAX_EVENTS, 0);
 
@@ -51,41 +55,81 @@ pub fn main() !void {
 
     std.debug.print("run other, {any}\n", .{server.sockfd});
 
+    const ptrServer = @as(u64, @intFromPtr(&server));
+
+    print("ptr: {any}\n", .{ptrServer});
+
     // Submit new events, like accepting new connections
-    _ = try ring.accept(@as(u64, @intFromPtr(&server)), server.sockfd.?, &addr.any, &addr_len, 0);
+    _ = try ring.accept(ptrServer, server.sockfd.?, &addr.any, &addr_len, 0);
 
     var allocator = std.heap.page_allocator;
 
+    var threadPool: std.Thread.Pool = undefined;
+    try threadPool.init(.{
+        .allocator = allocator,
+    });
+
+    try threadPool.spawn(gras, .{});
     // Main event loop
     while (true) {
         _ = try ring.submit_and_wait(1);
 
         while (ring.cq_ready() > 0) {
             const event = try ring.copy_cqe();
+
+            print("event {any}\n", .{event});
+
             var client = @as(*Socket, @ptrFromInt(@as(usize, @intCast(event.user_data))));
+
+            print("bbb {any}\n", .{client.state});
 
             switch (client.state) {
                 .accept => {
                     client = try allocator.create(Socket);
                     client.handle = @as(std.os.socket_t, @intCast(event.res));
                     client.state = .recv;
-                    _ = try ring.recv(@intFromPtr(client), client.handle, .{ .buffer = &client.buffer }, 0);
-                    _ = try ring.accept(@intFromPtr(&server), server.sockfd.?, &addr.any, &addr_len, 0);
+
+                    const timePkt = try packets.CharacterScreen.firstDate.init(allocator);
 
                     std.debug.print("Connected {any}\n", .{client});
+
+                    const buf = bytesUtil.packHeaderBytes(packets.CharacterScreen.firstDate, timePkt);
+
+                    std.debug.print("Buf {any}\n", .{buf});
+
+                    _ = try ring.recv(@intFromPtr(client), client.handle, .{ .buffer = &client.buffer }, 0);
+                    _ = try ring.send(@intFromPtr(client), client.handle, buf, 0);
+
+                    _ = try ring.accept(@intFromPtr(&server), server.sockfd.?, &addr.any, &addr_len, 0);
+
+                    print("test222\n", .{});
                 },
                 .recv => {
+                    std.debug.print("Recv {any}\n", .{client.buffer});
+
                     const read = @as(usize, @intCast(event.res));
-                    client.state = .send;
-                    _ = try ring.send(@intFromPtr(client), client.handle, client.buffer[0..read], 0);
+
+                    if (read == 2) {
+                        _ = try ring.send(@intFromPtr(client), client.handle, &[2]u8{ 0x00, 0x02 }, 0);
+                        continue;
+                    }
+
+                    const authEnter = bytesUtil.packHeaderBytes(
+                        packets.Undefined2,
+                        packets.Undefined2{
+                            .data = &[_]u8{ 0x00, 0x00, 0x00, 0x08, 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x32, 0x14 },
+                        },
+                    );
+
+                    _ = try ring.send(@intFromPtr(client), client.handle, authEnter, 0);
                 },
                 .send => {
+                    std.debug.print("Send {any}\n", .{client.buffer});
+
                     std.os.closeSocket(client.handle);
                     allocator.destroy(client);
                 },
             }
-
-            std.debug.print("{any}", .{event});
         }
 
         std.debug.print("test", .{});
