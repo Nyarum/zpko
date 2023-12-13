@@ -3,7 +3,7 @@ const std = @import("std");
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -26,11 +26,14 @@ pub fn build(b: *std.Build) void {
 
     exe.linkLibC();
     exe.addIncludePath(.{ .path = "libs/uuid4/src" });
-    exe.addCSourceFile(.{ .file = .{ .path = "libs/uuid4/src/uuid4.c" }, .flags = &.{
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-    } });
+    exe.addIncludePath(.{ .path = "libs/czmq/include" });
+    exe.addIncludePath(.{ .path = "libs/libzmq/include" });
+
+    exe.addCSourceFile(.{ .file = .{ .path = "libs/uuid4/src/uuid4.c" }, .flags = &.{} });
+    exe.addCSourceFile(.{ .file = .{ .path = "libs/czmq/src/zproc.c" }, .flags = &.{} });
+    exe.addCSourceFile(.{ .file = .{ .path = "libs/czmq/src/zsock.c" }, .flags = &.{} });
+    exe.addCSourceFile(.{ .file = .{ .path = "libs/czmq/src/zsys.c" }, .flags = &.{} });
+    exe.addCSourceFile(.{ .file = .{ .path = "libs/czmq/src/zactor.c" }, .flags = &.{} });
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default

@@ -7,6 +7,8 @@ const uuid = @import("./uuid.zig");
 const storage = @import("./storage.zig");
 const packets = @import("./packets.zig");
 const print = std.debug.print;
+const io_uring = std.os.linux.IO_Uring;
+const MAX_EVENTS = 1024; // Adjust based on expected load
 
 const Auth = struct {
     opcode: ?u16 = 431,
@@ -22,71 +24,71 @@ const Auth = struct {
     }
 };
 
+const State = enum { accept, recv, send };
+
+const Socket = struct {
+    handle: std.os.socket_t,
+    buffer: [1024]u8,
+    state: State,
+};
+
 const Bro = struct {
     ss: u8 = 1,
     key: []const u8,
 };
 
 pub fn main() !void {
-    print("{s}\n", .{uuid.UUID4.generate()});
+    var ring = try io_uring.init(MAX_EVENTS, 0);
 
-    const bytes = [_]u8{
-        0x00,
-        0x01,
-        0x02,
-        0x00,
-        0x01,
-        0x02,
-        0x00,
-        0x01,
-        0x02,
-        0x00,
-        0x01,
-        0x02,
-        0x00,
-        0x02,
-        0x00,
-        0x03,
-    };
-
-    const bro = Bro{
-        .key = "bro",
-    };
-
-    const buf = bytesUtil.packBytes(Bro, bro);
-    std.debug.print("{any}", .{buf});
-
-    const myStruct = bytesUtil.unpackBytes(Auth, &bytes);
-
-    std.debug.print("field1: {any}\n", .{myStruct.is_cheat});
-
-    const allocator = std.heap.page_allocator;
-
-    const stor = storage.Storage.init(allocator);
-    _ = stor;
-
+    // Initialize and set up the TCP server socket
     var server = net.StreamServer.init(.{});
     defer server.deinit();
 
-    try server.listen(try net.Address.parseIp4("127.0.0.1", 1973));
+    var addr = std.net.Address.initIp4(.{ 127, 0, 0, 1 }, 1973);
+    var addr_len: std.os.socklen_t = addr.getOsSockLen();
 
+    try server.listen(addr);
+
+    std.debug.print("run other, {any}\n", .{server.sockfd});
+
+    // Submit new events, like accepting new connections
+    _ = try ring.accept(@as(u64, @intFromPtr(&server)), server.sockfd.?, &addr.any, &addr_len, 0);
+
+    var allocator = std.heap.page_allocator;
+
+    // Main event loop
     while (true) {
-        const connection = try server.accept();
+        _ = try ring.submit_and_wait(1);
 
-        const timePkt = try packets.CharacterScreen.firstDate.init(allocator);
+        while (ring.cq_ready() > 0) {
+            const event = try ring.copy_cqe();
+            var client = @as(*Socket, @ptrFromInt(@as(usize, @intCast(event.user_data))));
 
-        std.debug.print("New connection: {}\n", .{connection.address});
+            switch (client.state) {
+                .accept => {
+                    client = try allocator.create(Socket);
+                    client.handle = @as(std.os.socket_t, @intCast(event.res));
+                    client.state = .recv;
+                    _ = try ring.recv(@intFromPtr(client), client.handle, .{ .buffer = &client.buffer }, 0);
+                    _ = try ring.accept(@intFromPtr(&server), server.sockfd.?, &addr.any, &addr_len, 0);
 
-        const thread = std.Thread.spawn(.{}, handleConnection, .{connection}) catch |err| {
-            std.log.err("can't spawn {any}", .{err});
-            continue;
-        };
-        thread.detach();
+                    std.debug.print("Connected {any}\n", .{client});
+                },
+                .recv => {
+                    const read = @as(usize, @intCast(event.res));
+                    client.state = .send;
+                    _ = try ring.send(@intFromPtr(client), client.handle, client.buffer[0..read], 0);
+                },
+                .send => {
+                    std.os.closeSocket(client.handle);
+                    allocator.destroy(client);
+                },
+            }
 
-        const size = try connection.stream.write(
-            bytesUtil.packHeaderBytes(packets.CharacterScreen.firstDate, timePkt),
-        );
-        _ = size;
+            std.debug.print("{any}", .{event});
+        }
+
+        std.debug.print("test", .{});
     }
 }
 
