@@ -18,17 +18,59 @@ const Socket = struct {
     state: State,
 };
 
+const Player = struct {
+    isAuth: bool = false,
+};
+
 pub const TCP = struct {
     ring: io_uring,
     server: net.StreamServer,
+    players: std.AutoHashMap(std.os.socket_t, Player),
+    mutex: std.Thread.Mutex = .{},
+    threadPool: std.Thread.Pool = undefined,
 
-    pub fn init() !TCP {
+    pub fn init(allocator: Allocator) !*TCP {
         const ring = try io_uring.init(MAX_EVENTS, 0);
 
-        return TCP{
+        var tcp = TCP{
             .ring = ring,
             .server = net.StreamServer.init(.{}),
+            .players = std.AutoHashMap(std.os.socket_t, Player).init(allocator),
         };
+
+        try tcp.threadPool.init(.{
+            .allocator = allocator,
+        });
+
+        return &tcp;
+    }
+
+    fn handleConnection(tcp: *TCP, client: *Socket, data: []u8) void {
+        _ = data;
+        tcp.mutex.lock();
+        var player = tcp.players.get(client.handle).?;
+        tcp.mutex.unlock();
+
+        if (!player.isAuth) {
+            const authEnter = bytesUtil.packHeaderBytes(
+                packets.Undefined2,
+                packets.Undefined2{
+                    .data = &[_]u8{ 0x00, 0x00, 0x00, 0x08, 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x32, 0x14 },
+                },
+            );
+
+            player.isAuth = true;
+
+            tcp.mutex.lock();
+            defer tcp.mutex.unlock();
+            tcp.players.put(client.handle, player) catch |err| {
+                print("err: {any}", .{err});
+            };
+
+            _ = tcp.ring.send(@intFromPtr(client), client.handle, authEnter, 0) catch |err| {
+                print("err: {any}", .{err});
+            };
+        }
     }
 
     pub fn start(tcp: *TCP, allocator: Allocator, addr: *std.net.Address) !void {
@@ -43,8 +85,6 @@ pub const TCP = struct {
 
         // Submit new events, like accepting new connections
         _ = try tcp.ring.accept(ptrServer, tcp.server.sockfd.?, &addr.any, &addr_len, 0);
-
-        var hashEnable = std.AutoHashMap(std.os.socket_t, u32).init(allocator);
 
         while (true) {
             _ = try tcp.ring.submit();
@@ -67,7 +107,7 @@ pub const TCP = struct {
                         client.handle = @as(std.os.socket_t, @intCast(event.res));
                         client.state = .recv;
 
-                        try hashEnable.put(client.handle, 0);
+                        try tcp.players.put(client.handle, Player{});
 
                         const timePkt = try packets.CharacterScreen.firstDate.init(allocator);
 
@@ -111,17 +151,11 @@ pub const TCP = struct {
 
                         std.debug.print("test! {any}\n", .{event.res});
 
-                        if (hashEnable.get(client.handle) == 0) {
-                            const authEnter = bytesUtil.packHeaderBytes(
-                                packets.Undefined2,
-                                packets.Undefined2{
-                                    .data = &[_]u8{ 0x00, 0x00, 0x00, 0x08, 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x32, 0x14 },
-                                },
-                            );
-                            try hashEnable.put(client.handle, hashEnable.get(client.handle).? + 1);
-
-                            _ = try tcp.ring.send(@intFromPtr(client), client.handle, authEnter, 0);
-                        }
+                        try tcp.threadPool.spawn(handleConnection, .{
+                            tcp,
+                            client,
+                            client.buffer[0..@as(usize, @intCast(event.res))],
+                        });
                     },
                     .send => {
                         std.debug.print("Send {any}\n", .{client.buffer});
