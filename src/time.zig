@@ -47,6 +47,7 @@ pub fn getCurrentTime(allocator: Allocator) ![]u8 {
     const dateTime = fromTimestamp(@as(u64, @intCast(now)));
 
     var list = std.ArrayList(u8).init(allocator);
+
     const delim: u8 = 1;
 
     const template = "[{:0>2}-{d:0>2} {:0>2}:{:0>2}:{:0>2}:{:0>3}]";
