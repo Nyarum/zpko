@@ -9,12 +9,13 @@ const packets = @import("./packets.zig");
 const print = std.debug.print;
 const io_uring = std.os.linux.IO_Uring;
 const MAX_EVENTS = 1024; // Adjust based on expected load
+const world = @import("./world.zig");
 
 const State = enum { accept, recv, send, closed };
 
 const Socket = struct {
     handle: std.os.socket_t,
-    buffer: [1024]u8,
+    buffer: ?[8096]u8,
     state: State,
 };
 
@@ -28,14 +29,16 @@ pub const TCP = struct {
     players: std.AutoHashMap(std.os.socket_t, Player),
     mutex: std.Thread.Mutex = .{},
     threadPool: std.Thread.Pool = undefined,
+    newWorld: *world.World,
 
-    pub fn init(allocator: Allocator) !*TCP {
+    pub fn init(allocator: Allocator, newWorld: *world.World) !*TCP {
         const ring = try io_uring.init(MAX_EVENTS, 0);
 
         var tcp = TCP{
             .ring = ring,
             .server = net.StreamServer.init(.{}),
             .players = std.AutoHashMap(std.os.socket_t, Player).init(allocator),
+            .newWorld = newWorld,
         };
 
         try tcp.threadPool.init(.{
@@ -45,32 +48,29 @@ pub const TCP = struct {
         return &tcp;
     }
 
-    fn handleConnection(tcp: *TCP, client: *Socket, data: []u8) void {
-        _ = data;
-        tcp.mutex.lock();
-        var player = tcp.players.get(client.handle).?;
-        tcp.mutex.unlock();
+    pub fn send(tcp: *TCP, client: std.os.socket_t, data: []const u8) !void {
+        const oldClient = &Socket{
+            .handle = client,
+            .buffer = null,
+            .state = .recv,
+        };
 
-        if (!player.isAuth) {
-            const authEnter = bytesUtil.packHeaderBytes(
-                packets.Undefined2,
-                packets.Undefined2{
-                    .data = &[_]u8{ 0x00, 0x00, 0x00, 0x08, 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x32, 0x14 },
-                },
-            );
+        print("send tcp", .{});
 
-            player.isAuth = true;
+        _ = tcp.ring.send(@intFromPtr(oldClient), oldClient.handle, data, 0) catch |err| {
+            print("err: {any}", .{err});
+        };
+    }
 
-            tcp.mutex.lock();
-            defer tcp.mutex.unlock();
-            tcp.players.put(client.handle, player) catch |err| {
-                print("err: {any}", .{err});
-            };
+    pub fn deinit(tcp: *TCP) void {
+        tcp.players.deinit();
 
-            _ = tcp.ring.send(@intFromPtr(client), client.handle, authEnter, 0) catch |err| {
-                print("err: {any}", .{err});
-            };
+        if (tcp.threadPool.threads.len > 0) {
+            tcp.threadPool.deinit();
         }
+
+        tcp.ring.deinit();
+        std.os.closeSocket(tcp.server.sockfd.?);
     }
 
     pub fn start(tcp: *TCP, allocator: Allocator, addr: *std.net.Address) !void {
@@ -117,7 +117,7 @@ pub const TCP = struct {
 
                         std.debug.print("Buf {any}\n", .{buf});
 
-                        _ = try tcp.ring.recv(@intFromPtr(client), client.handle, .{ .buffer = &client.buffer }, 0);
+                        _ = try tcp.ring.recv(@intFromPtr(client), client.handle, .{ .buffer = &client.buffer.? }, 0);
                         _ = try tcp.ring.send(@intFromPtr(client), client.handle, buf, 0);
                         _ = try tcp.ring.accept(ptrServer, tcp.server.sockfd.?, &addr.any, &addr_len, 0);
 
@@ -130,18 +130,18 @@ pub const TCP = struct {
                         if (event.res == 0 or event.res == -9) {
                             std.log.debug("connection is closed", .{});
                             _ = try tcp.ring.close(@intFromPtr(client), client.handle);
-                            return;
+                            continue;
                         }
 
                         if (event.res > 7) {
-                            if (std.mem.eql(u8, client.buffer[6..8], &[2]u8{ 0x01, 0xb0 })) {
+                            if (std.mem.eql(u8, client.buffer.?[6..8], &[2]u8{ 0x01, 0xb0 })) {
                                 client.state = State.closed;
                                 _ = try tcp.ring.close(@intFromPtr(client), client.handle);
                                 continue;
                             }
                         }
 
-                        _ = try tcp.ring.recv(@intFromPtr(client), client.handle, .{ .buffer = &client.buffer }, 0);
+                        _ = try tcp.ring.recv(@intFromPtr(client), client.handle, .{ .buffer = &client.buffer.? }, 0);
 
                         if (event.res <= 2) {
                             continue;
@@ -149,19 +149,17 @@ pub const TCP = struct {
 
                         std.debug.print("Recv {any}\n", .{client.buffer});
 
-                        std.debug.print("test! {any}\n", .{event.res});
-
-                        try tcp.threadPool.spawn(handleConnection, .{
+                        try tcp.threadPool.spawn(world.World.handlePlayerData, .{
+                            tcp.newWorld,
                             tcp,
-                            client,
-                            client.buffer[0..@as(usize, @intCast(event.res))],
+                            client.handle,
+                            client.buffer.?[0..@as(usize, @intCast(event.res))],
                         });
                     },
                     .send => {
                         std.debug.print("Send {any}\n", .{client.buffer});
 
-                        std.os.closeSocket(client.handle);
-                        allocator.destroy(client);
+                        _ = try tcp.ring.recv(@intFromPtr(client), client.handle, .{ .buffer = &client.buffer.? }, 0);
                     },
                 }
             }

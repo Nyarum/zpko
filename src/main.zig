@@ -6,6 +6,7 @@ const bytesUtil = @import("./bytes.zig");
 const uuid = @import("./uuid.zig");
 const storage = @import("./storage.zig");
 const packets = @import("./packets.zig");
+const world = @import("./world.zig");
 const print = std.debug.print;
 const io_uring = std.os.linux.IO_Uring;
 const MAX_EVENTS = 1024; // Adjust based on expected load
@@ -36,13 +37,23 @@ fn gras() void {
 
 pub fn main() !void {
     var addr = std.net.Address.initIp4(.{ 127, 0, 0, 1 }, 1973);
-    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
-    var tcpServer = try tcp.TCP.init(allocator);
-    defer tcpServer.server.deinit();
+    var newWorld = try world.World.init(allocator);
+    defer newWorld.deinit();
+
+    var tcpServer = try tcp.TCP.init(
+        allocator,
+        &newWorld,
+    );
+    defer tcpServer.deinit();
 
     tcpServer.start(allocator, &addr) catch |err| {
         print("Can't setup tcp server: {any}\n", .{err});
         return;
     };
+
+    print("testss\n", .{});
 }
