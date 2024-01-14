@@ -1,59 +1,43 @@
 const std = @import("std");
-const net = std.net;
-const Allocator = std.mem.Allocator;
-const timeUtil = @import("./time.zig");
-const bytesUtil = @import("./bytes.zig");
-const uuid = @import("./uuid.zig");
-const storage = @import("./storage.zig");
-const packets = @import("./packets.zig");
-const world = @import("./world.zig");
-const print = std.debug.print;
-const io_uring = std.os.linux.IO_Uring;
-const MAX_EVENTS = 1024; // Adjust based on expected load
-const tcp = @import("./tcp.zig");
-
-const Auth = struct {
-    opcode: ?u16 = 431,
-    key: []const u8,
-    login: []const u8,
-    password: []const u8,
-    mac: []const u8,
-    is_cheat: u16,
-    client_version: u16,
-
-    pub fn bro(_: Auth) void {
-        print("test", .{});
-    }
-};
-
-const Bro = struct {
-    ss: u8 = 1,
-    key: []const u8,
-};
-
-fn gras() void {
-    //print("hey", .{});
-}
+const Instant = std.time.Instant;
+const xev = @import("xev");
 
 pub fn main() !void {
-    var addr = std.net.Address.initIp4(.{ 127, 0, 0, 1 }, 1973);
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    // Initialize the loop state. Notice we can use a stack-allocated
+    // value here. We can even pass around the loop by value! The loop
+    // will contain all of our "completions" (watches).
+    var loop = try xev.Loop.init(.{});
+    defer loop.deinit();
 
-    var newWorld = try world.World.init(allocator);
-    defer newWorld.deinit();
+    var address = try std.net.Address.parseIp4("127.0.0.1", 0);
+    const server = try xev.TCP.init(address);
 
-    var tcpServer = try tcp.TCP.init(
-        allocator,
-        &newWorld,
-    );
-    defer tcpServer.deinit();
+    // Bind and listen
+    try server.bind(address);
+    try server.listen(1);
 
-    tcpServer.start(allocator, &addr) catch |err| {
-        print("Can't setup tcp server: {any}\n", .{err});
-        return;
-    };
+    // Retrieve bound port and initialize client
+    var sock_len = address.getOsSockLen();
+    try std.os.getsockname(server.fd, &address.any, &sock_len);
 
-    print("testss\n", .{});
+    var c_accept: xev.Completion = undefined;
+    var server_conn: ?xev.TCP = undefined;
+    server.accept(&loop, &c_accept, ?xev.TCP, &server_conn, (struct {
+        fn callback(
+            ud: ?*?xev.TCP,
+            _: *xev.Loop,
+            _: *xev.Completion,
+            r: xev.AcceptError!xev.TCP,
+        ) xev.CallbackAction {
+            _ = ud; // autofix
+            _ = r catch {
+                std.debug.print("test", .{});
+            }; // autofix
+            std.debug.print("test", .{});
+            return .disarm;
+        }
+    }).callback);
+
+    // Run the loop until there are no more completions.
+    try loop.run(.until_done);
 }

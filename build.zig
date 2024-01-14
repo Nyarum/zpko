@@ -15,6 +15,8 @@ pub fn build(b: *std.Build) !void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    const xev_module = b.dependency("xev", .{}).module("xev");
+
     const exe = b.addExecutable(.{
         .name = "zpko",
         // In this case the main source file is merely a path, however, in more
@@ -24,16 +26,11 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
+    exe.root_module.addImport("xev", xev_module);
+
     exe.linkLibC();
     exe.addIncludePath(.{ .path = "libs/uuid4/src" });
-    exe.addIncludePath(.{ .path = "libs/czmq/include" });
-    exe.addIncludePath(.{ .path = "libs/libzmq/include" });
-
     exe.addCSourceFile(.{ .file = .{ .path = "libs/uuid4/src/uuid4.c" }, .flags = &.{} });
-    exe.addCSourceFile(.{ .file = .{ .path = "libs/czmq/src/zproc.c" }, .flags = &.{} });
-    exe.addCSourceFile(.{ .file = .{ .path = "libs/czmq/src/zsock.c" }, .flags = &.{} });
-    exe.addCSourceFile(.{ .file = .{ .path = "libs/czmq/src/zsys.c" }, .flags = &.{} });
-    exe.addCSourceFile(.{ .file = .{ .path = "libs/czmq/src/zactor.c" }, .flags = &.{} });
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
