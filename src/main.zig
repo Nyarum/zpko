@@ -4,5 +4,5 @@ const xev = @import("xev");
 const loop = @import("loop.zig");
 
 pub fn main() !void {
-    try loop.init();
+    try loop.Loop.init();
 }
