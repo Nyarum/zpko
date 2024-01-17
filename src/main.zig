@@ -5,7 +5,7 @@ const loop = @import("loop.zig");
 const events = @import("events.zig");
 
 pub fn main() !void {
-    const the_loop = loop.Loop{ .react_cb = events.Events.react };
+    const the_loop = loop{ .react_cb = events.react };
 
     try the_loop.init();
 }

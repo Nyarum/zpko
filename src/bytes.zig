@@ -69,7 +69,7 @@ pub fn packBytes(comptime T: type, v: T) []const u8 {
             },
             u16 => {
                 const v2 = @field(v, field.name);
-                std.mem.writeInt(u16, buf[offset .. offset + 1], v2, std.builtin.Endian.big);
+                std.mem.writeInt(u16, buf[offset .. offset + 2], v2, std.builtin.Endian.big);
                 offset = offset + 1;
                 finalOffset = finalOffset + 1;
             },
@@ -84,8 +84,14 @@ pub fn packBytes(comptime T: type, v: T) []const u8 {
                 @memcpy(buf[offset .. offset + value.len], value[0..value.len]);
                 finalOffset = offset + @as(u8, @intCast(value.len));
             },
+            ?u16 => {
+                const v2 = @field(v, field.name);
+                std.mem.writeInt(u16, buf[offset .. offset + 2], v2.?, std.builtin.Endian.big);
+                offset = offset + 1;
+                finalOffset = finalOffset + 1;
+            },
             else => {
-                std.log.info("I don't know", .{});
+                std.log.info("I don't know type {any}", .{field});
             },
         }
     }
@@ -107,4 +113,22 @@ pub fn packHeaderBytes(comptime T: type, v: T) []const u8 {
     std.log.info("{x:0>2}", .{std.fmt.fmtSliceHexUpper(lenBuf[0..len])});
 
     return lenBuf[0..len];
+}
+
+const header = struct {
+    ln: u16,
+    id: u32,
+    opcode: u16,
+    body: []const u8,
+};
+
+pub fn unpackHeaderBytes(buf: []const u8) header {
+    const h = header{};
+
+    h.ln = std.mem.readInt(u16, buf, std.builtin.Endian.big);
+    h.id = std.mem.readInt(u32, buf, std.builtin.Endian.little);
+    h.opcode = std.mem.readInt(u16, buf, std.builtin.Endian.big);
+    h.body = buf[8..h.ln];
+
+    return h;
 }
