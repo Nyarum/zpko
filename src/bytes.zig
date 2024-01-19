@@ -87,8 +87,8 @@ pub fn packBytes(comptime T: type, v: T) []const u8 {
             ?u16 => {
                 const v2 = @field(v, field.name);
                 std.mem.writeInt(u16, buf[offset .. offset + 2], v2.?, std.builtin.Endian.big);
-                offset = offset + 1;
-                finalOffset = finalOffset + 1;
+                offset = offset + 2;
+                finalOffset = finalOffset + 2;
             },
             else => {
                 std.log.info("I don't know type {any}", .{field});
@@ -99,16 +99,18 @@ pub fn packBytes(comptime T: type, v: T) []const u8 {
     return buf[0..finalOffset];
 }
 
-pub fn packHeaderBytes(comptime T: type, v: T) []const u8 {
+pub fn packHeaderBytes(comptime T: type, v: T) []u8 {
     const buf = packBytes(T, v);
-    const len = buf.len + 8;
-    const opcode = v.opcode.?;
+    const len = buf.len + 6;
 
-    var lenBuf: [4096]u8 = undefined;
+    var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var lenBuf = aa.allocator().alloc(u8, 4096) catch unreachable;
+
     std.mem.writeInt(u16, lenBuf[0..2], @as(u16, @intCast(len)), std.builtin.Endian.big);
     std.mem.writeInt(u32, lenBuf[2..6], 0x80, std.builtin.Endian.little);
-    std.mem.writeInt(u16, lenBuf[6..8], opcode, std.builtin.Endian.big);
-    @memcpy(lenBuf[8..len], buf[0..]);
+
+    std.debug.print("ssss {any}\n", .{buf});
+    @memcpy(lenBuf[6..len], buf[0..]);
 
     std.log.info("{x:0>2}", .{std.fmt.fmtSliceHexUpper(lenBuf[0..len])});
 

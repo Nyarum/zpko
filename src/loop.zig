@@ -3,121 +3,189 @@ const bytes = @import("bytes.zig");
 const xev = @import("xev");
 const packets = @import("packets.zig");
 const types = @import("types.zig");
+const Allocator = std.mem.Allocator;
 
-var external_server: xev.TCP = undefined;
+const BufferPool = std.heap.MemoryPoolExtra([4096]u8, .{ .alignment = 0 });
+const CompletionPool = std.heap.MemoryPool(xev.Completion);
+const TCPPool = std.heap.MemoryPool(xev.TCP);
 
-pub fn init(the_loop: @This()) !void {
-    _ = the_loop; // autofix
-    var loop = try xev.Loop.init(.{});
-    defer loop.deinit();
+pub const Server = struct {
+    loop: *xev.Loop,
+    buffer_pool: BufferPool,
+    completion_pool: CompletionPool,
+    socket_pool: TCPPool,
+    stop: bool,
+    alloc: Allocator,
 
-    var address = try std.net.Address.parseIp4("127.0.0.1", 1973);
-    external_server = try xev.TCP.init(address);
-
-    // Bind and listen
-    try external_server.bind(address);
-    try external_server.listen(0);
-
-    // Retrieve bound port and initialize client
-    var sock_len = address.getOsSockLen();
-    try std.os.getsockname(external_server.fd, &address.any, &sock_len);
-
-    var c_accept: xev.Completion = undefined;
-    var server_conn: ?xev.TCP = undefined;
-    external_server.accept(&loop, &c_accept, ?xev.TCP, &server_conn, @This().on_connection);
-
-    // Run the loop until there are no more completions.
-    try loop.run(.until_done);
-
-    std.debug.print("test222\n", .{});
-
-    while (true) {
-        std.time.sleep(1000);
+    pub fn init(alloc: Allocator, loop: *xev.Loop) !Server {
+        return .{
+            .loop = loop,
+            .buffer_pool = BufferPool.init(alloc),
+            .completion_pool = CompletionPool.init(alloc),
+            .socket_pool = TCPPool.init(alloc),
+            .stop = false,
+            .alloc = alloc,
+        };
     }
-}
 
-react_cb: *const fn (data: []const u8) []const u8,
+    pub fn deinit(self: *Server) void {
+        self.buffer_pool.deinit();
+        self.completion_pool.deinit();
+        self.socket_pool.deinit();
+    }
 
-pub fn on_connection(
-    ud: ?*?xev.TCP,
-    internal_loop: *xev.Loop,
-    internal_accept: *xev.Completion,
-    r: xev.AcceptError!xev.TCP,
-) xev.CallbackAction {
-    _ = internal_accept; // autofix
-    _ = r catch |err| {
-        std.debug.print("can't accept {any}", .{err});
-    };
+    /// Must be called with stable self pointer.
+    pub fn start(self: *Server) !void {
+        const addr = try std.net.Address.parseIp4("127.0.0.1", 1973);
+        var socket = try xev.TCP.init(addr);
 
-    ud.?.* = r catch unreachable;
+        const c = try self.completion_pool.create();
+        try socket.bind(addr);
+        try socket.listen(std.os.linux.SOMAXCONN);
+        socket.accept(self.loop, c, Server, self, acceptCallback);
+    }
 
-    std.debug.print("connected {any}\n", .{r});
+    pub fn threadMain(self: *Server) !void {
+        try self.loop.run(.until_done);
+    }
 
-    //var recv_buf: [4096]u8 = undefined;
-    //var recv_len: usize = 0;
+    fn destroyBuf(self: *Server, buf: []const u8) void {
+        self.buffer_pool.destroy(
+            @alignCast(
+                @as(*[4096]u8, @ptrFromInt(@intFromPtr(buf.ptr))),
+            ),
+        );
+    }
 
-    //ud.?.*.?.read(&copy_internal_loop, &copy_internal_accept, .{ .slice = &recv_buf }, usize, &recv_len, @This().on_read);
+    fn acceptCallback(
+        self_: ?*Server,
+        l: *xev.Loop,
+        c: *xev.Completion,
+        r: xev.TCP.AcceptError!xev.TCP,
+    ) xev.CallbackAction {
+        const self = self_.?;
 
-    //var recv_buf: [4096]u8 = undefined;
-    //var recv_len: usize = 0;
+        // Create our socket
+        const socket = self.socket_pool.create() catch unreachable;
+        socket.* = r catch unreachable;
 
-    //var c_read: xev.Completion = undefined;
-    //external_server.read(internal_loop, &c_read, .{ .slice = &recv_buf }, usize, &recv_len, @This().on_read);
+        // Start reading -- we can reuse c here because its done.
+        const buf = self.buffer_pool.create() catch unreachable;
+        socket.read(l, c, .{ .slice = buf }, Server, self, readCallback);
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+        const w_c = self.completion_pool.create() catch unreachable;
 
-    const datePkt = packets.CharacterScreen.firstDate.init(allocator) catch |err| {
-        std.debug.print("can't init firstDate {any}", .{err});
-        return .rearm;
-    };
+        const datePkt = packets.CharacterScreen.firstDate.init(self.alloc) catch |err| {
+            std.debug.print("can't init firstDate {any}", .{err});
+            return .rearm;
+        };
+        const first_date = bytes.packHeaderBytes(packets.CharacterScreen.firstDate, datePkt);
 
-    const writeBuf = bytes.packHeaderBytes(packets.CharacterScreen.firstDate, datePkt);
+        std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(first_date)});
 
-    std.debug.print("out write buf {any}\n", .{writeBuf});
+        socket.write(l, w_c, .{ .slice = first_date }, Server, self, writeCallback);
 
-    var c_write: xev.Completion = undefined;
-    external_server.write(internal_loop, &c_write, .{ .slice = writeBuf }, void, null, (struct {
-        fn callback(
-            _: ?*void,
-            _: *xev.Loop,
-            c: *xev.Completion,
-            _: xev.TCP,
-            _: xev.WriteBuffer,
-            r2: xev.TCP.WriteError!usize,
-        ) xev.CallbackAction {
-            _ = r2 catch |err| {
-                std.debug.print("can't accept {any}", .{err});
-            };
+        return .disarm;
+    }
 
-            std.debug.print("test2ss2", .{});
+    fn readCallback(
+        self_: ?*Server,
+        loop: *xev.Loop,
+        c: *xev.Completion,
+        socket: xev.TCP,
+        buf: xev.ReadBuffer,
+        r: xev.TCP.ReadError!usize,
+    ) xev.CallbackAction {
+        const self = self_.?;
+        const n = r catch |err| switch (err) {
+            error.EOF => {
+                self.destroyBuf(buf.slice);
+                socket.shutdown(loop, c, Server, self, shutdownCallback);
+                return .disarm;
+            },
 
-            _ = c;
-            return .disarm;
+            else => {
+                self.destroyBuf(buf.slice);
+                self.completion_pool.destroy(c);
+                std.log.warn("server read unexpected err={}", .{err});
+                return .disarm;
+            },
+        };
+
+        if (n == 2) {
+            const w_c = self.completion_pool.create() catch unreachable;
+            socket.write(loop, w_c, .{ .slice = buf.slice[0..n] }, Server, self, writeCallback);
+
+            return .rearm;
         }
-    }).callback);
 
-    std.debug.print("test", .{});
+        std.debug.print("Read buf: {any}", .{buf.slice[0..n]});
 
-    return .rearm;
-}
+        const authEnter = struct {
+            opcode: ?u16 = 931,
+            value: []const u8 = &[_]u8{ 0x00, 0x00, 0x00, 0x08, 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x32, 0x14 },
+        };
+        const auth_enter = authEnter{};
+        const auth_enter_pkt = bytes.packHeaderBytes(authEnter, auth_enter);
 
-pub fn on_read(
-    ud: ?*usize,
-    _: *xev.Loop,
-    _: *xev.Completion,
-    _: xev.TCP,
-    rb: xev.ReadBuffer,
-    r: xev.TCP.ReadError!usize,
-) xev.CallbackAction {
-    std.debug.print("recv: {any}\n", .{rb.slice});
-    _ = ud; // autofix
-    _ = r catch |err| {
-        std.debug.print("can't read {any}", .{err});
-    };
+        const w_c = self.completion_pool.create() catch unreachable;
 
-    std.debug.print("recv: {any}\n", .{rb.slice});
+        std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(auth_enter_pkt)});
 
-    return .rearm;
-}
+        socket.write(loop, w_c, .{ .slice = auth_enter_pkt }, Server, self, writeCallback);
+
+        // Read again
+        return .rearm;
+    }
+
+    fn writeCallback(
+        self_: ?*Server,
+        l: *xev.Loop,
+        c: *xev.Completion,
+        s: xev.TCP,
+        buf: xev.WriteBuffer,
+        r: xev.TCP.WriteError!usize,
+    ) xev.CallbackAction {
+        _ = buf; // autofix
+        _ = l;
+        _ = s;
+        _ = r catch unreachable;
+
+        // We do nothing for write, just put back objects into the pool.
+        const self = self_.?;
+        self.completion_pool.destroy(c);
+
+        return .disarm;
+    }
+
+    fn shutdownCallback(
+        self_: ?*Server,
+        l: *xev.Loop,
+        c: *xev.Completion,
+        s: xev.TCP,
+        r: xev.TCP.ShutdownError!void,
+    ) xev.CallbackAction {
+        _ = r catch {};
+
+        const self = self_.?;
+        s.close(l, c, Server, self, closeCallback);
+        return .disarm;
+    }
+
+    fn closeCallback(
+        self_: ?*Server,
+        l: *xev.Loop,
+        c: *xev.Completion,
+        socket: xev.TCP,
+        r: xev.TCP.CloseError!void,
+    ) xev.CallbackAction {
+        _ = l;
+        _ = r catch unreachable;
+        _ = socket;
+
+        const self = self_.?;
+        self.stop = true;
+        self.completion_pool.destroy(c);
+        return .disarm;
+    }
+};
