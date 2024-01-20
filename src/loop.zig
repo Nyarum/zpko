@@ -1,8 +1,8 @@
 const std = @import("std");
-const bytes = @import("bytes.zig");
+const bytes = @import("bytes");
 const xev = @import("xev");
-const packets = @import("packets.zig");
-const types = @import("types.zig");
+const packets = @import("packets");
+const types = @import("types");
 const Allocator = std.mem.Allocator;
 
 const BufferPool = std.heap.MemoryPoolExtra([4096]u8, .{ .alignment = 0 });
