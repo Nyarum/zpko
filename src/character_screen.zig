@@ -1,9 +1,9 @@
 const std = @import("std");
 const print = std.debug.print;
-const timeUtil = @import("../time.zig");
+const timeUtil = @import("time.zig");
 const Allocator = std.mem.Allocator;
 const bytes = @import("bytes.zig");
-const custom_types = @import("types");
+const custom_types = @import("types.zig");
 
 pub const firstDate = struct {
     opcode: ?u16 = 940,
@@ -33,54 +33,51 @@ pub const auth = struct {
 };
 
 pub const InstAttr = struct {
-    id: u16,
-    value: u16,
+    id: u16 = 0,
+    value: u16 = 0,
 };
 
 pub const ItemAttr = struct {
-    attr: u16,
-    is_init: bool,
+    attr: u16 = 0,
+    is_init: bool = false,
 };
 
 pub const ItemGrid = struct {
-    id: u16,
-    num: u16,
-    endure: [2]u16,
-    energy: [2]u16,
-    forge_lv: u8,
-    db_params: [2]u32,
-    inst_attrs: [5]InstAttr,
-    item_attrs: [40]ItemAttr,
-    is_change: bool,
+    id: u16 = 0,
+    num: u16 = 0,
+    endure: [2]u16 = [2]u16{ 0, 0 },
+    energy: [2]u16 = [2]u16{ 0, 0 },
+    forge_lv: u8 = 0,
+    db_params: [2]u32 = [2]u32{ 0, 0 },
+    inst_attrs: [5]InstAttr = undefined,
+    item_attrs: [40]ItemAttr = undefined,
+    is_change: bool = false,
 };
 
 pub const Look = struct {
     ver: u16,
     type_id: u16,
-    item_grids: [10]ItemGrid,
+    item_grids: [10]ItemGrid = undefined,
     hair: u16,
 };
 
 pub const Character = struct {
-    active: bool,
-    name: [32]u8,
-    job: [32]u8,
-    map: [32]u8,
+    active: bool = false,
+    name: []const u8,
+    job: []const u8,
     level: u16,
-    look_size: u16,
     look: Look,
 };
 
 pub const CharactersChoice = struct {
     opcode: u16 = 931,
-    error_code: u16,
-    key_len: u16,
-    key: []const u8,
-    character_len: u8,
-    characters: []const Character,
-    pincode: u8,
-    encryption: u32,
-    dw_flag: u32,
+    error_code: u16 = 0,
+    key: custom_types.bytes = custom_types.bytes{ .value = &[_]u8{ 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49 } },
+    character_len: u8 = 0,
+    characters: []const Character = &[_]Character{},
+    pincode: u8 = 1,
+    encryption: u32 = 0,
+    dw_flag: u32 = 12820,
 };
 
 fn prints(comptime text: []const u8, param: anytype) void {
@@ -88,25 +85,29 @@ fn prints(comptime text: []const u8, param: anytype) void {
 }
 
 test "pack with header for characters choice" {
-    const characters_choice = CharactersChoice{
-        .error_code = 0,
-        .key_len = 32,
-        .key = &[_]u8{0} ** 32,
-        .character_len = 1,
-        .characters = &[_]Character{.{
-            .active = true,
-            .name = [_]u8{0} ** 32,
-            .job = [_]u8{0} ** 32,
-            .map = [_]u8{0} ** 32,
-            .level = 0,
-            .look_size = 0,
-            .look = .{ .ver = 0, .type_id = 0, .item_grids = undefined, .hair = 0 },
-        }},
-        .pincode = 0,
-        .encryption = 0,
-        .dw_flag = 0,
-    };
-    const auth_enter_pkt = bytes.packHeaderBytes(CharactersChoice, characters_choice);
+    const characters_choice = CharactersChoice{};
+    const auth_enter_pkt = bytes.packHeaderBytes(characters_choice);
 
     std.debug.print("bytes output: {X:1}\n", .{auth_enter_pkt});
+}
+
+test "pack with header for characters choice with one character" {
+    const character = Character{
+        .job = "test",
+        .level = 0,
+        .active = true,
+        .name = "test",
+        .look = .{
+            .ver = 0,
+            .type_id = 0,
+            .hair = 0,
+            .item_grids = undefined,
+        },
+    };
+
+    const characters_choice = CharactersChoice{ .characters = &[_]Character{character}, .character_len = 1 };
+
+    const auth_enter_pkt = bytes.packHeaderBytes(characters_choice);
+
+    std.debug.print("bytes output: {X:1}\n", .{std.fmt.fmtSliceHexUpper(auth_enter_pkt)});
 }

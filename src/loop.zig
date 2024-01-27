@@ -1,9 +1,10 @@
 const std = @import("std");
-const bytes = @import("bytes");
+const bytes = @import("bytes.zig");
 const xev = @import("xev");
-const packets = @import("packets");
-const types = @import("types");
+const cs = @import("character_screen.zig");
+const types = @import("types.zig");
 const Allocator = std.mem.Allocator;
+const events = @import("events.zig");
 
 const BufferPool = std.heap.MemoryPoolExtra([4096]u8, .{ .alignment = 0 });
 const CompletionPool = std.heap.MemoryPool(xev.Completion);
@@ -75,11 +76,11 @@ pub const Server = struct {
 
         const w_c = self.completion_pool.create() catch unreachable;
 
-        const datePkt = packets.CharacterScreen.firstDate.init(self.alloc) catch |err| {
+        const datePkt = cs.firstDate.init(self.alloc) catch |err| {
             std.debug.print("can't init firstDate {any}", .{err});
             return .rearm;
         };
-        const first_date = bytes.packHeaderBytes(packets.CharacterScreen.firstDate, datePkt);
+        const first_date = bytes.packHeaderBytes(datePkt);
 
         std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(first_date)});
 
@@ -119,20 +120,16 @@ pub const Server = struct {
             return .rearm;
         }
 
-        std.debug.print("Read buf: {any}", .{buf.slice[0..n]});
+        std.debug.print("Read buf: {any}\n", .{std.fmt.fmtSliceHexUpper(buf.slice[0..n])});
 
-        const authEnter = struct {
-            opcode: ?u16 = 931,
-            value: []const u8 = &[_]u8{ 0x00, 0x00, 0x00, 0x08, 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x32, 0x14 },
-        };
-        const auth_enter = authEnter{};
-        const auth_enter_pkt = bytes.packHeaderBytes(authEnter, auth_enter);
+        const header = bytes.unpackHeaderBytes(buf.slice[0..n]);
+        const res = events.react(header.opcode, header.body);
 
         const w_c = self.completion_pool.create() catch unreachable;
 
-        std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(auth_enter_pkt)});
+        std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(res)});
 
-        socket.write(loop, w_c, .{ .slice = auth_enter_pkt }, Server, self, writeCallback);
+        socket.write(loop, w_c, .{ .slice = res }, Server, self, writeCallback);
 
         // Read again
         return .rearm;

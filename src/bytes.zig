@@ -1,7 +1,7 @@
 const std = @import("std");
 const print = std.debug.print;
 const custom_types = @import("types.zig");
-const packets = @import("packets.zig");
+const cs = @import("character_screen.zig");
 
 fn isFieldOptional(comptime T: type, field_index: usize) !bool {
     const fields = @typeInfo(T).Struct.fields;
@@ -55,69 +55,171 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) T {
     return result;
 }
 
-pub fn packBytes(comptime T: type, v: T) []const u8 {
+pub fn packBytes(v: anytype) []const u8 {
     var buf: [4096]u8 = undefined;
-    comptime var offset: u16 = 0;
     var finalOffset: u16 = 0;
 
-    inline for (std.meta.fields(T)) |field| {
-        std.debug.print("slice2222 {any}\n", .{field.type});
+    inline for (std.meta.fields(@TypeOf(v))) |field| {
+        //std.debug.print("field: {s} and it type {any}\n", .{ field.name, field.type });
 
         switch (field.type) {
             u8 => {
+                var buf2: [1]u8 = undefined;
                 const v2 = @field(v, field.name);
-                std.mem.writeInt(u8, buf[offset .. offset + 1], v2, std.builtin.Endian.big);
-                offset = offset + 1;
+                std.mem.writeInt(u8, &buf2, v2, std.builtin.Endian.big);
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 1], buf2[0..]);
                 finalOffset = finalOffset + 1;
+            },
+            bool => {
+                var buf2: [1]u8 = undefined;
+                const v2 = @field(v, field.name);
+
+                if (v2) {
+                    std.mem.writeInt(u8, &buf2, 1, std.builtin.Endian.big);
+                } else {
+                    std.mem.writeInt(u8, &buf2, 0, std.builtin.Endian.big);
+                }
+
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 1], buf2[0..]);
+                finalOffset = finalOffset + 1;
+            },
+            [2]u16 => {
+                const vs = @field(v, field.name);
+
+                for (vs) |internal_v| {
+                    var buf2: [2]u8 = undefined;
+                    std.mem.writeInt(u16, &buf2, internal_v, std.builtin.Endian.big);
+                    std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
+                    finalOffset = finalOffset + 2;
+                }
+            },
+            [2]u32 => {
+                const vs = @field(v, field.name);
+
+                for (vs) |internal_v| {
+                    var buf2: [4]u8 = undefined;
+                    std.mem.writeInt(u32, &buf2, internal_v, std.builtin.Endian.big);
+                    std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 4], buf2[0..]);
+                    finalOffset = finalOffset + 4;
+                }
             },
             u16 => {
                 const v2 = @field(v, field.name);
-                std.mem.writeInt(u16, buf[offset .. offset + 2], v2, std.builtin.Endian.big);
-                offset = offset + 2;
+                var buf2: [2]u8 = undefined;
+                std.mem.writeInt(u16, &buf2, v2, std.builtin.Endian.big);
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                 finalOffset = finalOffset + 2;
             },
             u32 => {
                 const v2 = @field(v, field.name);
-                std.mem.writeInt(u32, buf[offset .. offset + 4], v2, std.builtin.Endian.big);
-                offset = offset + 4;
+                var buf2: [4]u8 = undefined;
+                std.mem.writeInt(u32, &buf2, v2, std.builtin.Endian.big);
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 4], buf2[0..]);
                 finalOffset = finalOffset + 4;
             },
             []const u8 => {
                 const v2 = @field(v, field.name);
-                @memcpy(buf[offset .. offset + v2.len], v2[0..v2.len]);
-                finalOffset = offset + @as(u8, @intCast(v2.len));
+
+                var buf2: [2]u8 = undefined;
+                std.mem.writeInt(u16, &buf2, @as(u16, @intCast(v2.len + 1)), std.builtin.Endian.big);
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
+                finalOffset = finalOffset + 2;
+
+                std.mem.copyForwards(u8, buf[finalOffset..], v2[0..]);
+                finalOffset = finalOffset + @as(u16, @intCast(v2.len));
+
+                std.mem.copyForwards(u8, buf[finalOffset..], "\x00");
+                finalOffset = finalOffset + 1;
             },
             custom_types.plain_string => {
                 const v2 = @field(v, field.name);
                 const value = v2.value;
-                @memcpy(buf[offset .. offset + value.len], value[0..value.len]);
-                finalOffset = offset + @as(u8, @intCast(value.len));
+                @memcpy(buf[finalOffset .. finalOffset + value.len], value[0..value.len]);
+                finalOffset = finalOffset + @as(u8, @intCast(value.len));
+            },
+            custom_types.bytes => {
+                const v2 = @field(v, field.name).value;
+
+                var buf2: [2]u8 = undefined;
+                std.mem.writeInt(u16, &buf2, @as(u16, @intCast(v2.len)), std.builtin.Endian.big);
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
+                finalOffset = finalOffset + 2;
+
+                std.mem.copyForwards(u8, buf[finalOffset..], v2[0..]);
+                finalOffset = finalOffset + @as(u16, @intCast(v2.len));
             },
             ?u16 => {
-                const v2 = @field(v, field.name);
-                std.mem.writeInt(u16, buf[offset .. offset + 2], v2.?, std.builtin.Endian.big);
-                offset = offset + 2;
+                const v2 = @field(v, field.name).?;
+                var buf2: [2]u8 = undefined;
+                std.mem.writeInt(u16, &buf2, v2, std.builtin.Endian.big);
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                 finalOffset = finalOffset + 2;
             },
-            []const packets.CharacterScreen.Character => {
-                for (@field(v, field.name)) |*char| {
-                    return packBytes(packets.CharacterScreen.Character, char.*);
+            []const cs.Character => {
+                const c_field = @field(v, field.name);
+
+                for (c_field) |*char| {
+                    const pack_bytes = packBytes(char.*);
+                    std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+                    finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
                 }
             },
-            packets.CharacterScreen.Look => {
-                return packBytes(field.type, @field(v, field.name));
+            cs.Look => {
+                const pack_bytes = packBytes(@field(v, field.name));
+
+                var buf2: [2]u8 = undefined;
+                std.mem.writeInt(u16, &buf2, @as(u16, @intCast(pack_bytes.len)), std.builtin.Endian.big);
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
+                finalOffset = finalOffset + 2;
+
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+                finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
+
+                std.debug.print("test final len {any}\n", .{pack_bytes.len});
+                std.debug.print("test look len {any}\n", .{finalOffset});
+            },
+            [5]cs.InstAttr => {
+                const inst_attrs = @field(v, field.name);
+
+                for (inst_attrs) |ia| {
+                    const pack_bytes = packBytes(ia);
+                    std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+                    finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
+                }
+            },
+            [40]cs.ItemAttr => {
+                const item_attrs = @field(v, field.name);
+
+                for (item_attrs) |ia| {
+                    const pack_bytes = packBytes(ia);
+                    std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+                    finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
+
+                    //std.debug.print("item attr size {any}\n", .{pack_bytes.len});
+                }
+            },
+            [10]cs.ItemGrid => {
+                const item_grids = @field(v, field.name);
+
+                for (item_grids) |id| {
+                    const pack_bytes = packBytes(id);
+                    std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+                    finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
+                }
             },
             else => {
-                //std.debug.print("?u16 {any}\n", .{@typeInfo(field.type)});
+                std.debug.print("not found handle for the type {any}\n", .{@typeInfo(field.type)});
             },
         }
     }
 
+    std.debug.print("final offset size {any}\n", .{finalOffset});
+
     return buf[0..finalOffset];
 }
 
-pub fn packHeaderBytes(comptime T: type, v: T) []u8 {
-    const buf = packBytes(T, v);
+pub fn packHeaderBytes(v: anytype) []u8 {
+    const buf = packBytes(v);
     const len = buf.len + 6;
 
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -141,23 +243,13 @@ const header = struct {
 };
 
 pub fn unpackHeaderBytes(buf: []const u8) header {
-    const h = header{};
+    var h: header = undefined;
 
-    h.ln = std.mem.readInt(u16, buf, std.builtin.Endian.big);
-    h.id = std.mem.readInt(u32, buf, std.builtin.Endian.little);
-    h.opcode = std.mem.readInt(u16, buf, std.builtin.Endian.big);
+    h.ln = std.mem.readInt(u16, buf[0..2], std.builtin.Endian.big);
+    h.id = std.mem.readInt(u32, buf[2..6], std.builtin.Endian.little);
+    h.opcode = std.mem.readInt(u16, buf[6..8], std.builtin.Endian.big);
+
     h.body = buf[8..h.ln];
 
     return h;
-}
-
-test "pack_header_bytes" {
-    const authEnter = struct {
-        opcode: ?u16 = 931,
-        value: []const u8 = &[_]u8{ 0x00, 0x00, 0x00, 0x08, 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x32, 0x14 },
-    };
-    const auth_enter = authEnter{};
-    const auth_enter_pkt = packHeaderBytes(authEnter, auth_enter);
-
-    std.debug.print("test {any}", .{auth_enter_pkt});
 }
