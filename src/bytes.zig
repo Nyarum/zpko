@@ -174,9 +174,6 @@ pub fn packBytes(v: anytype) []const u8 {
 
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
                 finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
-
-                std.debug.print("test final len {any}\n", .{pack_bytes.len});
-                std.debug.print("test look len {any}\n", .{finalOffset});
             },
             [5]cs.InstAttr => {
                 const inst_attrs = @field(v, field.name);
@@ -212,8 +209,6 @@ pub fn packBytes(v: anytype) []const u8 {
             },
         }
     }
-
-    std.debug.print("final offset size {any}\n", .{finalOffset});
 
     return buf[0..finalOffset];
 }
