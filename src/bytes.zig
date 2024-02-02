@@ -2,6 +2,7 @@ const std = @import("std");
 const print = std.debug.print;
 const custom_types = @import("types.zig");
 const cs = @import("character_screen.zig");
+const Allocator = std.mem.Allocator;
 
 fn isFieldOptional(comptime T: type, field_index: usize) !bool {
     const fields = @typeInfo(T).Struct.fields;
@@ -213,12 +214,21 @@ pub fn packBytes(v: anytype) []const u8 {
     return buf[0..finalOffset];
 }
 
-pub fn packHeaderBytes(v: anytype) []u8 {
+const returnHeader = struct {
+    resp: []u8,
+    len: usize,
+};
+
+pub fn packHeaderBytes(allocator: Allocator, v: anytype) returnHeader {
+    var lenBuf: []u8 = allocator.alloc(u8, 4096) catch unreachable;
+    defer allocator.free(lenBuf);
+
     const buf = packBytes(v);
     const len = buf.len + 6;
 
-    var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    var lenBuf = aa.allocator().alloc(u8, 4096) catch unreachable;
+    std.log.info("{x:0>2}", .{std.fmt.fmtSliceHexUpper(buf)});
+
+    std.log.info("{x:0>2}", .{std.fmt.fmtSliceHexUpper(buf)});
 
     std.mem.writeInt(u16, lenBuf[0..2], @as(u16, @intCast(len)), std.builtin.Endian.big);
     std.mem.writeInt(u32, lenBuf[2..6], 0x80, std.builtin.Endian.little);
@@ -227,7 +237,13 @@ pub fn packHeaderBytes(v: anytype) []u8 {
 
     std.log.info("{x:0>2}", .{std.fmt.fmtSliceHexUpper(lenBuf[0..len])});
 
-    return lenBuf[0..len];
+    const new_array = allocator.alloc(u8, len) catch unreachable;
+    std.mem.copyForwards(u8, new_array, lenBuf[0..len]);
+
+    return returnHeader{
+        .resp = new_array,
+        .len = len,
+    };
 }
 
 const header = struct {

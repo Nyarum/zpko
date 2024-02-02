@@ -10,6 +10,11 @@ const BufferPool = std.heap.MemoryPoolExtra([4096]u8, .{ .alignment = 0 });
 const CompletionPool = std.heap.MemoryPool(xev.Completion);
 const TCPPool = std.heap.MemoryPool(xev.TCP);
 
+pub const ReadBuffer = struct {
+    slice: []u8,
+    len: usize,
+};
+
 pub const Server = struct {
     loop: *xev.Loop,
     buffer_pool: BufferPool,
@@ -80,11 +85,13 @@ pub const Server = struct {
             std.debug.print("can't init firstDate {any}", .{err});
             return .rearm;
         };
-        const first_date = bytes.packHeaderBytes(datePkt);
+        defer self.alloc.free(datePkt.date.value);
 
-        std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(first_date)});
+        const first_date = bytes.packHeaderBytes(self.alloc, datePkt);
 
-        socket.write(l, w_c, .{ .slice = first_date }, Server, self, writeCallback);
+        std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(first_date.resp)});
+
+        socket.write(l, w_c, .{ .slice = first_date.resp }, Server, self, writeCallback);
 
         return .disarm;
     }
@@ -114,8 +121,11 @@ pub const Server = struct {
         };
 
         if (n == 2) {
+            const new_array = self.alloc.alloc(u8, 2) catch unreachable;
+            std.mem.copyForwards(u8, new_array, buf.slice[0..n]);
+
             const w_c = self.completion_pool.create() catch unreachable;
-            socket.write(loop, w_c, .{ .slice = buf.slice[0..n] }, Server, self, writeCallback);
+            socket.write(loop, w_c, .{ .slice = new_array }, Server, self, writeCallback);
 
             return .rearm;
         }
@@ -123,13 +133,19 @@ pub const Server = struct {
         std.debug.print("Read buf: {any}\n", .{std.fmt.fmtSliceHexUpper(buf.slice[0..n])});
 
         const header = bytes.unpackHeaderBytes(buf.slice[0..n]);
-        const res = events.react(header.opcode, header.body);
+        const res = events.react(self.alloc, header.opcode, header.body);
+
+        if (res == null) {
+            self.destroyBuf(buf.slice);
+            socket.shutdown(loop, c, Server, self, shutdownCallback);
+            return .disarm;
+        }
 
         const w_c = self.completion_pool.create() catch unreachable;
 
-        std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(res)});
+        std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(res.?)});
 
-        socket.write(loop, w_c, .{ .slice = res }, Server, self, writeCallback);
+        socket.write(loop, w_c, .{ .slice = res.? }, Server, self, writeCallback);
 
         // Read again
         return .rearm;
@@ -143,7 +159,6 @@ pub const Server = struct {
         buf: xev.WriteBuffer,
         r: xev.TCP.WriteError!usize,
     ) xev.CallbackAction {
-        _ = buf; // autofix
         _ = l;
         _ = s;
         _ = r catch unreachable;
@@ -151,6 +166,7 @@ pub const Server = struct {
         // We do nothing for write, just put back objects into the pool.
         const self = self_.?;
         self.completion_pool.destroy(c);
+        self.alloc.free(buf.slice);
 
         return .disarm;
     }

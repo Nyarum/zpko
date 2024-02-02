@@ -3,14 +3,19 @@ const cs = @import("character_screen.zig");
 const bytes = @import("bytes.zig");
 const custom_types = @import("types.zig");
 
-pub fn react(opcode: u16, data: []const u8) []const u8 {
+pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]const u8 {
     switch (opcode) {
         431 => { // auth
             const res = reactAuth(
                 bytes.unpackBytes(cs.auth, data),
             );
 
-            return bytes.packHeaderBytes(res.characters);
+            const header = bytes.packHeaderBytes(allocator, res.characters);
+
+            return header.resp[0..header.len];
+        },
+        432 => { // exit
+            return null;
         },
         else => {
             std.debug.print("no way, opcode {any}\n", .{opcode});
