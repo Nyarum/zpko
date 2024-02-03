@@ -214,15 +214,8 @@ pub fn packBytes(v: anytype) []const u8 {
     return buf[0..finalOffset];
 }
 
-const returnHeader = struct {
-    resp: []u8,
-    len: usize,
-};
-
-pub fn packHeaderBytes(allocator: Allocator, v: anytype) returnHeader {
-    var lenBuf: []u8 = allocator.alloc(u8, 4096) catch unreachable;
-    defer allocator.free(lenBuf);
-
+pub fn packHeaderBytes(allocator: Allocator, v: anytype) []const u8 {
+    var lenBuf: [4096]u8 = std.mem.zeroes([4096]u8);
     const buf = packBytes(v);
     const len = buf.len + 6;
 
@@ -240,10 +233,7 @@ pub fn packHeaderBytes(allocator: Allocator, v: anytype) returnHeader {
     const new_array = allocator.alloc(u8, len) catch unreachable;
     std.mem.copyForwards(u8, new_array, lenBuf[0..len]);
 
-    return returnHeader{
-        .resp = new_array,
-        .len = len,
-    };
+    return new_array;
 }
 
 const header = struct {

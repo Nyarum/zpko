@@ -69,6 +69,7 @@ pub const Server = struct {
         c: *xev.Completion,
         r: xev.TCP.AcceptError!xev.TCP,
     ) xev.CallbackAction {
+        _ = c; // autofix
         const self = self_.?;
 
         // Create our socket
@@ -76,8 +77,10 @@ pub const Server = struct {
         socket.* = r catch unreachable;
 
         // Start reading -- we can reuse c here because its done.
+        const new_c = self.completion_pool.create() catch unreachable;
+
         const buf = self.buffer_pool.create() catch unreachable;
-        socket.read(l, c, .{ .slice = buf }, Server, self, readCallback);
+        socket.read(l, new_c, .{ .slice = buf }, Server, self, readCallback);
 
         const w_c = self.completion_pool.create() catch unreachable;
 
@@ -87,13 +90,15 @@ pub const Server = struct {
         };
         defer self.alloc.free(datePkt.date.value);
 
+        const packBuf = self.buffer_pool.create() catch unreachable;
+        _ = packBuf; // autofix
         const first_date = bytes.packHeaderBytes(self.alloc, datePkt);
 
-        std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(first_date.resp)});
+        std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(first_date)});
 
-        socket.write(l, w_c, .{ .slice = first_date.resp }, Server, self, writeCallback);
+        socket.write(l, w_c, .{ .slice = first_date }, Server, self, writeCallback);
 
-        return .disarm;
+        return .rearm;
     }
 
     fn readCallback(

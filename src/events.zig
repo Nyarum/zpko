@@ -10,9 +10,9 @@ pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]con
                 bytes.unpackBytes(cs.auth, data),
             );
 
-            const header = bytes.packHeaderBytes(allocator, res.characters);
+            const buf = bytes.packHeaderBytes(allocator, res.characters);
 
-            return header.resp[0..header.len];
+            return buf;
         },
         432 => { // exit
             return null;
