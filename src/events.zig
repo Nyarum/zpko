@@ -44,7 +44,36 @@ fn reactAuth(data: cs.auth) authResp {
         },
     };
 
-    const characters_choice = cs.CharactersChoice{ .characters = &[_]cs.Character{character}, .character_len = 1 };
+    const character1 = cs.Character{
+        .job = "test",
+        .level = 1,
+        .active = true,
+        .name = "test222",
+        .look = .{
+            .ver = 0,
+            .type_id = 512,
+            .hair = 3592,
+            .item_grids = undefined,
+        },
+    };
+
+    const character2 = cs.Character{
+        .job = "test",
+        .level = 1,
+        .active = true,
+        .name = "test23",
+        .look = .{
+            .ver = 0,
+            .type_id = 512,
+            .hair = 3592,
+            .item_grids = undefined,
+        },
+    };
+
+    const characters_choice = cs.CharactersChoice{
+        .characters = &[_]cs.Character{ character, character1, character2 },
+        .character_len = 3,
+    };
 
     return authResp{ .characters = characters_choice };
 }

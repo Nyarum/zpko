@@ -4,6 +4,8 @@ const custom_types = @import("types.zig");
 const cs = @import("character_screen.zig");
 const Allocator = std.mem.Allocator;
 
+const default_buf_size = 8192;
+
 fn isFieldOptional(comptime T: type, field_index: usize) !bool {
     const fields = @typeInfo(T).Struct.fields;
     return switch (field_index) {
@@ -57,7 +59,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) T {
 }
 
 pub fn packBytes(v: anytype) []const u8 {
-    var buf: [4096]u8 = undefined;
+    var buf: [default_buf_size]u8 = undefined;
     var finalOffset: u16 = 0;
 
     inline for (std.meta.fields(@TypeOf(v))) |field| {
@@ -215,7 +217,7 @@ pub fn packBytes(v: anytype) []const u8 {
 }
 
 pub fn packHeaderBytes(allocator: Allocator, v: anytype) []const u8 {
-    var lenBuf: [4096]u8 = std.mem.zeroes([4096]u8);
+    var lenBuf: [default_buf_size]u8 = std.mem.zeroes([default_buf_size]u8);
     const buf = packBytes(v);
     const len = buf.len + 6;
 
