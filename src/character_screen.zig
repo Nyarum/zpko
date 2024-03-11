@@ -51,13 +51,16 @@ fn prints(comptime text: []const u8, param: anytype) void {
 }
 
 test "pack with header for characters choice" {
+    const allocator = std.heap.page_allocator;
     const characters_choice = CharactersChoice{};
-    const auth_enter_pkt = bytes.packHeaderBytes(characters_choice);
+    const auth_enter_pkt = bytes.packHeaderBytes(allocator, characters_choice);
 
     std.debug.print("bytes output: {X:1}\n", .{auth_enter_pkt});
 }
 
 test "pack with header for characters choice with one character" {
+    const allocator = std.heap.page_allocator;
+
     const character = sub_packets.Character{
         .job = "test",
         .level = 0,
@@ -73,7 +76,7 @@ test "pack with header for characters choice with one character" {
 
     const characters_choice = CharactersChoice{ .characters = &[_]sub_packets.Character{character}, .character_len = 1 };
 
-    const auth_enter_pkt = bytes.packHeaderBytes(characters_choice);
+    const auth_enter_pkt = bytes.packHeaderBytes(allocator, characters_choice);
 
     std.debug.print("bytes output: {X:1}\n", .{std.fmt.fmtSliceHexUpper(auth_enter_pkt)});
 }
