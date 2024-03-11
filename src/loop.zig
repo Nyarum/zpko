@@ -88,10 +88,8 @@ pub const Server = struct {
             std.debug.print("can't init firstDate {any}", .{err});
             return .rearm;
         };
-        defer self.alloc.free(datePkt.date.value);
+        //defer self.alloc.free(datePkt.date.value);
 
-        const packBuf = self.buffer_pool.create() catch unreachable;
-        _ = packBuf; // autofix
         const first_date = bytes.packHeaderBytes(self.alloc, datePkt);
 
         std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(first_date)});

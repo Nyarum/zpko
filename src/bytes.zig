@@ -59,7 +59,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) T {
     return result;
 }
 
-pub fn packBytes(v: anytype) []const u8 {
+pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
     var buf: [default_buf_size]u8 = undefined;
     var finalOffset: u16 = 0;
 
@@ -163,13 +163,13 @@ pub fn packBytes(v: anytype) []const u8 {
                 const c_field = @field(v, field.name);
 
                 for (c_field) |*char| {
-                    const pack_bytes = packBytes(char.*);
+                    const pack_bytes = packBytes(allocator, char.*, i + 1);
                     std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
                     finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
                 }
             },
             sub_packets.Look => {
-                const pack_bytes = packBytes(@field(v, field.name));
+                const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1);
 
                 var buf2: [2]u8 = undefined;
                 std.mem.writeInt(u16, &buf2, @as(u16, @intCast(pack_bytes.len)), std.builtin.Endian.big);
@@ -183,7 +183,7 @@ pub fn packBytes(v: anytype) []const u8 {
                 const inst_attrs = @field(v, field.name);
 
                 for (inst_attrs) |ia| {
-                    const pack_bytes = packBytes(ia);
+                    const pack_bytes = packBytes(allocator, ia, i + 1);
                     std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
                     finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
                 }
@@ -192,7 +192,7 @@ pub fn packBytes(v: anytype) []const u8 {
                 const item_attrs = @field(v, field.name);
 
                 for (item_attrs) |ia| {
-                    const pack_bytes = packBytes(ia);
+                    const pack_bytes = packBytes(allocator, ia, i + 1);
                     std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
                     finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
 
@@ -203,7 +203,7 @@ pub fn packBytes(v: anytype) []const u8 {
                 const item_grids = @field(v, field.name);
 
                 for (item_grids) |id| {
-                    const pack_bytes = packBytes(id);
+                    const pack_bytes = packBytes(allocator, id, i + 1);
                     std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
                     finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
                 }
@@ -214,29 +214,29 @@ pub fn packBytes(v: anytype) []const u8 {
         }
     }
 
+    if (i == 0) {
+        const new_array = allocator.alloc(u8, finalOffset + 6) catch unreachable;
+        std.mem.copyForwards(u8, new_array[6..], buf[0..finalOffset]);
+        return new_array;
+    }
+
     return buf[0..finalOffset];
 }
 
-pub fn packHeaderBytes(allocator: Allocator, v: anytype) []const u8 {
-    var lenBuf: [default_buf_size]u8 = std.mem.zeroes([default_buf_size]u8);
-    const buf = packBytes(v);
-    const len = buf.len + 6;
+pub fn packHeaderBytes(allocator: Allocator, v: anytype) []u8 {
+    var buf = packBytes(allocator, v, 0);
+    var lenBuf: [6]u8 = std.mem.zeroes([6]u8);
+    const len = buf.len;
 
-    std.log.info("{x:0>2}", .{std.fmt.fmtSliceHexUpper(buf)});
-
-    std.log.info("{x:0>2}", .{std.fmt.fmtSliceHexUpper(buf)});
+    std.debug.print("before: {x:0>2}", .{std.fmt.fmtSliceHexUpper(buf)});
 
     std.mem.writeInt(u16, lenBuf[0..2], @as(u16, @intCast(len)), std.builtin.Endian.big);
     std.mem.writeInt(u32, lenBuf[2..6], 0x80, std.builtin.Endian.little);
+    std.mem.copyBackwards(u8, buf[0..6], lenBuf[0..6]);
 
-    @memcpy(lenBuf[6..len], buf[0..]);
+    std.debug.print("after: {x:0>2}", .{std.fmt.fmtSliceHexUpper(buf)});
 
-    std.log.info("{x:0>2}", .{std.fmt.fmtSliceHexUpper(lenBuf[0..len])});
-
-    const new_array = allocator.alloc(u8, len) catch unreachable;
-    std.mem.copyForwards(u8, new_array, lenBuf[0..len]);
-
-    return new_array;
+    return buf;
 }
 
 const header = struct {
