@@ -2,6 +2,7 @@ const std = @import("std");
 const cs = @import("character_screen.zig");
 const bytes = @import("bytes.zig");
 const custom_types = @import("types.zig");
+const sub_packets = @import("sub_packets.zig");
 
 pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]const u8 {
     switch (opcode) {
@@ -31,7 +32,7 @@ const authResp = union {
 
 fn reactAuth(data: cs.auth) authResp {
     _ = data; // autofix
-    const character = cs.Character{
+    const character = sub_packets.Character{
         .job = "test",
         .level = 1,
         .active = true,
@@ -44,7 +45,7 @@ fn reactAuth(data: cs.auth) authResp {
         },
     };
 
-    const character1 = cs.Character{
+    const character1 = sub_packets.Character{
         .job = "test",
         .level = 1,
         .active = true,
@@ -57,7 +58,7 @@ fn reactAuth(data: cs.auth) authResp {
         },
     };
 
-    const character2 = cs.Character{
+    const character2 = sub_packets.Character{
         .job = "test",
         .level = 1,
         .active = true,
@@ -71,7 +72,7 @@ fn reactAuth(data: cs.auth) authResp {
     };
 
     const characters_choice = cs.CharactersChoice{
-        .characters = &[_]cs.Character{ character, character1, character2 },
+        .characters = &[_]sub_packets.Character{ character, character1, character2 },
         .character_len = 3,
     };
 

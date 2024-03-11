@@ -2,6 +2,7 @@ const std = @import("std");
 const print = std.debug.print;
 const custom_types = @import("types.zig");
 const cs = @import("character_screen.zig");
+const sub_packets = @import("sub_packets.zig");
 const Allocator = std.mem.Allocator;
 
 const default_buf_size = 8192;
@@ -158,7 +159,7 @@ pub fn packBytes(v: anytype) []const u8 {
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                 finalOffset = finalOffset + 2;
             },
-            []const cs.Character => {
+            []const sub_packets.Character => {
                 const c_field = @field(v, field.name);
 
                 for (c_field) |*char| {
@@ -167,7 +168,7 @@ pub fn packBytes(v: anytype) []const u8 {
                     finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
                 }
             },
-            cs.Look => {
+            sub_packets.Look => {
                 const pack_bytes = packBytes(@field(v, field.name));
 
                 var buf2: [2]u8 = undefined;
@@ -178,7 +179,7 @@ pub fn packBytes(v: anytype) []const u8 {
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
                 finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
             },
-            [5]cs.InstAttr => {
+            [5]sub_packets.InstAttr => {
                 const inst_attrs = @field(v, field.name);
 
                 for (inst_attrs) |ia| {
@@ -187,7 +188,7 @@ pub fn packBytes(v: anytype) []const u8 {
                     finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
                 }
             },
-            [40]cs.ItemAttr => {
+            [40]sub_packets.ItemAttr => {
                 const item_attrs = @field(v, field.name);
 
                 for (item_attrs) |ia| {
@@ -198,7 +199,7 @@ pub fn packBytes(v: anytype) []const u8 {
                     //std.debug.print("item attr size {any}\n", .{pack_bytes.len});
                 }
             },
-            [10]cs.ItemGrid => {
+            [10]sub_packets.ItemGrid => {
                 const item_grids = @field(v, field.name);
 
                 for (item_grids) |id| {

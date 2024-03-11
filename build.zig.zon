@@ -3,6 +3,6 @@
     .paths = .{""},
     .version = "0.0.0",
     .dependencies = .{
-        .xev = .{ .url = "https://github.com/mitchellh/libxev/archive/4e6781895e4e6c477597c8c2713d36cd82b57d07.tar.gz", .hash = "12203f87e00caa6c07c02a748f234a5c0ee2ca5c334ec464e88810d93e7b5495a56f" },
+        .xev = .{ .url = "https://github.com/mitchellh/libxev/archive/c0a07796c1b536de5dc3725b6aab95fa54a1ac84.tar.gz", .hash = "1220824436d1a4a5b35a1149be50b6abc46f3eed57216e5bf9ba6cf2bbc9d7f7922d" },
     },
 }
