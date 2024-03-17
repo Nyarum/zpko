@@ -5,6 +5,7 @@ const cs = @import("character_screen.zig");
 const types = @import("types.zig");
 const Allocator = std.mem.Allocator;
 const events = @import("events.zig");
+const lmdb = @import("lmdb");
 
 const BufferPool = std.heap.MemoryPoolExtra([4096]u8, .{ .alignment = 0 });
 const CompletionPool = std.heap.MemoryPool(xev.Completion);
@@ -22,16 +23,13 @@ pub const Server = struct {
     socket_pool: TCPPool,
     stop: bool,
     alloc: Allocator,
+    db: lmdb.Environment,
+    ev: events,
 
-    pub fn init(alloc: Allocator, loop: *xev.Loop) !Server {
-        return .{
-            .loop = loop,
-            .buffer_pool = BufferPool.init(alloc),
-            .completion_pool = CompletionPool.init(alloc),
-            .socket_pool = TCPPool.init(alloc),
-            .stop = false,
-            .alloc = alloc,
-        };
+    pub fn init(alloc: Allocator, loop: *xev.Loop, db: lmdb.Environment) !Server {
+        return .{ .loop = loop, .buffer_pool = BufferPool.init(alloc), .completion_pool = CompletionPool.init(alloc), .socket_pool = TCPPool.init(alloc), .stop = false, .alloc = alloc, .db = db, .ev = events{
+            .db = db,
+        } };
     }
 
     pub fn deinit(self: *Server) void {

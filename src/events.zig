@@ -3,6 +3,9 @@ const cs = @import("character_screen.zig");
 const bytes = @import("bytes.zig");
 const custom_types = @import("types.zig");
 const sub_packets = @import("sub_packets.zig");
+const lmdb = @import("lmdb");
+
+db: lmdb.Environment = undefined,
 
 pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]const u8 {
     switch (opcode) {
@@ -17,6 +20,15 @@ pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]con
         },
         432 => { // exit
             return null;
+        },
+        435 => { // create character
+            const res = reactCreateCharacter(
+                bytes.unpackBytes(cs.createCharacter, data),
+            );
+
+            const buf = bytes.packHeaderBytes(allocator, res.characters);
+
+            return buf;
         },
         else => {
             std.debug.print("no way, opcode {any}\n", .{opcode});
@@ -77,6 +89,12 @@ fn reactAuth(data: cs.auth) authResp {
     };
 
     return authResp{ .characters = characters_choice };
+}
+
+fn reactCreateCharacter(data: cs.createCharacter) authResp {
+    _ = data; // autofix
+
+    return authResp{};
 }
 
 test "reactAuth" {

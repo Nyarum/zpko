@@ -16,6 +16,7 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const xev_module = b.dependency("xev", .{}).module("xev");
+    const lmdb_module = b.dependency("lmdb", .{}).module("lmdb");
 
     const exe = b.addExecutable(.{
         .name = "zpko",
@@ -27,6 +28,7 @@ pub fn build(b: *std.Build) !void {
     });
 
     exe.root_module.addImport("xev", xev_module);
+    exe.root_module.addImport("lmdb", lmdb_module);
 
     exe.linkLibC();
     // This declares intent for the executable to be installed into the

@@ -44,7 +44,12 @@ pub const CharactersChoice = struct {
     dw_flag: u32 = 12820,
 };
 
-pub const createCharacter = struct { opcode: u16 };
+pub const createCharacter = struct {
+    opcode: ?u16,
+    name: []const u8,
+    map: []const u8,
+    look: sub_packets.Look,
+};
 
 fn prints(comptime text: []const u8, param: anytype) void {
     std.debug.print(text ++ ": {any}", .{param});

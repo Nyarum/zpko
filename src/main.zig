@@ -3,8 +3,15 @@ const Instant = std.time.Instant;
 const xev = @import("xev");
 const the_loop = @import("loop.zig");
 const events = @import("events.zig");
+const lmdb = @import("lmdb");
+const database = @import("database.zig");
 
 pub fn main() !void {
+    const env = try lmdb.Environment.init("database", .{});
+    defer env.deinit();
+
+    //try database.saveCharacter(env);
+
     var thread_pool = xev.ThreadPool.init(.{});
     defer thread_pool.deinit();
     defer thread_pool.shutdown();
@@ -20,7 +27,7 @@ pub fn main() !void {
     });
     defer server_loop.deinit();
 
-    var server = try the_loop.Server.init(alloc, &server_loop);
+    var server = try the_loop.Server.init(alloc, &server_loop, env);
     defer server.deinit();
     try server.start();
 
