@@ -17,7 +17,21 @@ fn isFieldOptional(comptime T: type, field_index: usize) !bool {
     };
 }
 
-pub fn unpackBytes(comptime T: type, bytes: []const u8) T {
+fn unpack_return_func(comptime T: type) type {
+    return struct {
+        return_type: T,
+        buf: []const u8,
+
+        pub fn init(internal_return_type: T, internal_buf: []const u8) unpack_return_func(T) {
+            return unpack_return_func(T){
+                .return_type = internal_return_type,
+                .buf = internal_buf,
+            };
+        }
+    };
+}
+
+pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
     var result: T = undefined;
     var modBuf = bytes;
     const fields = std.meta.fields(T);
@@ -50,44 +64,10 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) T {
                     @field(result, field.name) = str;
                 },
                 sub_packets.Look => {
-                    const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1);
+                    const unpack_struct = unpackBytes(field.type, modBuf);
 
-                    var buf2: [2]u8 = undefined;
-                    std.mem.writeInt(u16, &buf2, @as(u16, @intCast(pack_bytes.len)), std.builtin.Endian.big);
-                    std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
-                    finalOffset = finalOffset + 2;
-
-                    std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
-                    finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
-                },
-                [5]sub_packets.InstAttr => {
-                    const inst_attrs = @field(v, field.name);
-
-                    for (inst_attrs) |ia| {
-                        const pack_bytes = packBytes(allocator, ia, i + 1);
-                        std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
-                        finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
-                    }
-                },
-                [40]sub_packets.ItemAttr => {
-                    const item_attrs = @field(v, field.name);
-
-                    for (item_attrs) |ia| {
-                        const pack_bytes = packBytes(allocator, ia, i + 1);
-                        std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
-                        finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
-
-                        //std.debug.print("item attr size {any}\n", .{pack_bytes.len});
-                    }
-                },
-                [10]sub_packets.ItemGrid => {
-                    const item_grids = @field(v, field.name);
-
-                    for (item_grids) |id| {
-                        const pack_bytes = packBytes(allocator, id, i + 1);
-                        std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
-                        finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
-                    }
+                    @field(result, field.name) = unpack_struct.return_type;
+                    modBuf = unpack_struct.buf;
                 },
                 else => {
                     std.log.info("I don't know", .{});
@@ -96,7 +76,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) T {
         }
     }
 
-    return result;
+    return unpack_return_func(T).init(result, modBuf);
 }
 
 pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {

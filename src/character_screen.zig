@@ -45,7 +45,6 @@ pub const CharactersChoice = struct {
 };
 
 pub const createCharacter = struct {
-    opcode: ?u16,
     name: []const u8,
     map: []const u8,
     look: sub_packets.Look,
@@ -84,4 +83,12 @@ test "pack with header for characters choice with one character" {
     const auth_enter_pkt = bytes.packHeaderBytes(allocator, characters_choice);
 
     std.debug.print("bytes output: {X:1}\n", .{std.fmt.fmtSliceHexUpper(auth_enter_pkt)});
+}
+
+test "unpack create character" {
+    const buf: []const u8 = &[_]u8{ 0x00, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 };
+
+    const create_character = bytes.unpackBytes(createCharacter, buf);
+
+    std.debug.print("create character: {any}\n", .{create_character});
 }

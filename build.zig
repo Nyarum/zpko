@@ -1,9 +1,17 @@
 const std = @import("std");
+const LazyPath = std.Build.LazyPath;
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
 pub fn build(b: *std.Build) !void {
+    const lmdb = b.addModule("lmdb", .{ .root_source_file = LazyPath.relative("libs/zig-lmdb/src/lib.zig") });
+    const lmdb_dep = b.dependency("lmdb", .{});
+
+    lmdb.addIncludePath(lmdb_dep.path("libraries/liblmdb"));
+    lmdb.addCSourceFile(.{ .file = lmdb_dep.path("libraries/liblmdb/mdb.c") });
+    lmdb.addCSourceFile(.{ .file = lmdb_dep.path("libraries/liblmdb/midl.c") });
+
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -16,7 +24,7 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const xev_module = b.dependency("xev", .{}).module("xev");
-    const lmdb_module = b.dependency("lmdb", .{}).module("lmdb");
+    //const lmdb_module = b.anonymousDependency("libs/zig-lmdb", @import("libs/zig-lmdb/build.zig"), .{}).module("lmdb");
 
     const exe = b.addExecutable(.{
         .name = "zpko",
@@ -28,7 +36,7 @@ pub fn build(b: *std.Build) !void {
     });
 
     exe.root_module.addImport("xev", xev_module);
-    exe.root_module.addImport("lmdb", lmdb_module);
+    exe.root_module.addImport("lmdb", lmdb);
 
     exe.linkLibC();
     // This declares intent for the executable to be installed into the
