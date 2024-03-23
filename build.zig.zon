@@ -4,5 +4,13 @@
     .version = "0.0.0",
     .dependencies = .{
         .xev = .{ .url = "https://github.com/mitchellh/libxev/archive/0f73adfda1cff9c740160717b5431ebada6b8755.tar.gz", .hash = "12203dcbe098ee49ea242432cd198b1ca557626988f056bea86630dcfe8660244407" },
+        .pretty = .{
+            .url = "https://github.com/timfayz/pretty/archive/v0.9.3.tar.gz",
+            .hash = "1220b78396db74b148d5da7d8be46ce7cf9109fc5c2027303c577eee009b8088bce9",
+        },
+        .lmdb = .{
+            .url = "https://github.com/LMDB/lmdb/archive/refs/tags/LMDB_0.9.31.tar.gz",
+            .hash = "12209bfdbf43d479c2cac0ca2212853ab2136f1621f49461f62c7932a7819bc29110",
+        },
     },
 }

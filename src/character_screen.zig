@@ -5,6 +5,7 @@ const Allocator = std.mem.Allocator;
 const bytes = @import("bytes.zig");
 const custom_types = @import("types.zig");
 const sub_packets = @import("sub_packets.zig");
+const pretty = @import("pretty");
 
 pub const firstDate = struct {
     opcode: ?u16 = 940,

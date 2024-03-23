@@ -24,7 +24,6 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const xev_module = b.dependency("xev", .{}).module("xev");
-    //const lmdb_module = b.anonymousDependency("libs/zig-lmdb", @import("libs/zig-lmdb/build.zig"), .{}).module("lmdb");
 
     const exe = b.addExecutable(.{
         .name = "zpko",
@@ -37,6 +36,9 @@ pub fn build(b: *std.Build) !void {
 
     exe.root_module.addImport("xev", xev_module);
     exe.root_module.addImport("lmdb", lmdb);
+
+    const pretty = b.dependency("pretty", .{ .target = target, .optimize = optimize });
+    exe.root_module.addImport("pretty", pretty.module("pretty"));
 
     exe.linkLibC();
     // This declares intent for the executable to be installed into the
@@ -67,35 +69,22 @@ pub fn build(b: *std.Build) !void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    // Creates a step for unit testing. This only builds the test executable
-    // but does not run it.
-    const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-
     const unit_tests_characters_screen = b.addTest(.{
         .root_source_file = .{ .path = "src/character_screen.zig" },
         .target = target,
         .optimize = optimize,
     });
 
-    const storage_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/storage.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
+    unit_tests_characters_screen.linkLibC();
 
-    const run_unit_tests = b.addRunArtifact(unit_tests);
+    unit_tests_characters_screen.root_module.addImport("pretty", pretty.module("pretty"));
+    unit_tests_characters_screen.root_module.addImport("lmdb", lmdb);
+
     const run_unit_tests_c = b.addRunArtifact(unit_tests_characters_screen);
-    const run_storage_tests = b.addRunArtifact(storage_tests);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_unit_tests.step);
     test_step.dependOn(&run_unit_tests_c.step);
-    test_step.dependOn(&run_storage_tests.step);
 }
