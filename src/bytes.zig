@@ -1,8 +1,7 @@
 const std = @import("std");
 const print = std.debug.print;
 const custom_types = @import("types.zig");
-const cs = @import("character_screen.zig");
-const sub_packets = @import("sub_packets.zig");
+const character_screen = @import("character_screen");
 const Allocator = std.mem.Allocator;
 
 const default_buf_size = 8192;
@@ -63,7 +62,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
                     modBuf = modBuf[lnStr..];
                     @field(result, field.name) = str;
                 },
-                sub_packets.Look => {
+                character_screen.structs.Look => {
                     const unpack_struct = unpackBytes(field.type, modBuf);
 
                     @field(result, field.name) = unpack_struct.return_type;
@@ -179,7 +178,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                 finalOffset = finalOffset + 2;
             },
-            []const sub_packets.Character => {
+            []const character_screen.structs.Character => {
                 const c_field = @field(v, field.name);
 
                 for (c_field) |*char| {
@@ -188,7 +187,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                     finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
                 }
             },
-            sub_packets.Look => {
+            character_screen.structs.Look => {
                 const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1);
 
                 var buf2: [2]u8 = undefined;
@@ -199,7 +198,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
                 finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
             },
-            [5]sub_packets.InstAttr => {
+            [5]character_screen.structs.InstAttr => {
                 const inst_attrs = @field(v, field.name);
 
                 for (inst_attrs) |ia| {
@@ -208,7 +207,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                     finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
                 }
             },
-            [40]sub_packets.ItemAttr => {
+            [40]character_screen.structs.ItemAttr => {
                 const item_attrs = @field(v, field.name);
 
                 for (item_attrs) |ia| {
@@ -219,7 +218,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                     //std.debug.print("item attr size {any}\n", .{pack_bytes.len});
                 }
             },
-            [10]sub_packets.ItemGrid => {
+            [10]character_screen.structs.ItemGrid => {
                 const item_grids = @field(v, field.name);
 
                 for (item_grids) |id| {

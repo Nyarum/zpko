@@ -1,3 +1,6 @@
+const std = @import("std");
+const custom_types = @import("../types.zig");
+
 pub const InstAttr = struct {
     id: u16 = 0,
     value: u16 = 0,
@@ -32,5 +35,22 @@ pub const Character = struct {
     name: []const u8,
     job: []const u8,
     level: u16,
+    look: Look,
+};
+
+pub const CharactersChoice = struct {
+    opcode: u16 = 931,
+    error_code: u16 = 0,
+    key: custom_types.bytes = custom_types.bytes{ .value = &[_]u8{ 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49 } },
+    character_len: u8 = 0,
+    characters: []const Character = &[_]Character{},
+    pincode: u8 = 1,
+    encryption: u32 = 0,
+    dw_flag: u32 = 12820,
+};
+
+pub const createCharacter = struct {
+    name: []const u8,
+    map: []const u8,
     look: Look,
 };

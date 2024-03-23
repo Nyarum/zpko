@@ -24,6 +24,13 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const xev_module = b.dependency("xev", .{}).module("xev");
+    const character_screen_module = b.createModule(.{
+        .root_source_file = LazyPath.relative("src/character_screen/import.zig"),
+    });
+
+    const bytes_module = b.createModule(.{ .root_source_file = LazyPath.relative("src/bytes.zig"), .imports = &.{
+        .{ .name = "character_screen", .module = character_screen_module },
+    } });
 
     const exe = b.addExecutable(.{
         .name = "zpko",
@@ -70,7 +77,7 @@ pub fn build(b: *std.Build) !void {
     run_step.dependOn(&run_cmd.step);
 
     const unit_tests_characters_screen = b.addTest(.{
-        .root_source_file = .{ .path = "src/character_screen.zig" },
+        .root_source_file = .{ .path = "src/character_screen/tests.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -79,6 +86,8 @@ pub fn build(b: *std.Build) !void {
 
     unit_tests_characters_screen.root_module.addImport("pretty", pretty.module("pretty"));
     unit_tests_characters_screen.root_module.addImport("lmdb", lmdb);
+    unit_tests_characters_screen.root_module.addImport("bytes", bytes_module);
+    unit_tests_characters_screen.root_module.addImport("character_screen", character_screen_module);
 
     const run_unit_tests_c = b.addRunArtifact(unit_tests_characters_screen);
 
