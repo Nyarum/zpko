@@ -1,8 +1,7 @@
 const std = @import("std");
-const cs = @import("character_screen.zig");
-const bytes = @import("bytes.zig");
-const custom_types = @import("types.zig");
-const sub_packets = @import("sub_packets.zig");
+const auth = @import("auth");
+const cs = @import("character_screen");
+const core = @import("import.zig");
 const lmdb = @import("lmdb");
 
 db: lmdb.Environment = undefined,
@@ -11,10 +10,10 @@ pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]con
     switch (opcode) {
         431 => { // auth
             const res = reactAuth(
-                bytes.unpackBytes(cs.auth, data),
+                core.bytes.unpackBytes(auth.structs.auth, data).return_type,
             );
 
-            const buf = bytes.packHeaderBytes(allocator, res.characters);
+            const buf = core.bytes.packHeaderBytes(allocator, res.characters);
 
             return buf;
         },
@@ -23,10 +22,10 @@ pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]con
         },
         435 => { // create character
             const res = reactCreateCharacter(
-                bytes.unpackBytes(cs.createCharacter, data),
+                core.bytes.unpackBytes(cs.structs.createCharacter, data).return_type,
             );
 
-            const buf = bytes.packHeaderBytes(allocator, res.characters);
+            const buf = core.bytes.packHeaderBytes(allocator, res.characters);
 
             return buf;
         },
@@ -39,12 +38,12 @@ pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]con
 }
 
 const authResp = union {
-    characters: cs.CharactersChoice,
+    characters: cs.structs.CharactersChoice,
 };
 
-fn reactAuth(data: cs.auth) authResp {
+fn reactAuth(data: auth.structs.auth) authResp {
     _ = data; // autofix
-    const character = sub_packets.Character{
+    const character = cs.structs.Character{
         .job = "test",
         .level = 1,
         .active = true,
@@ -57,7 +56,7 @@ fn reactAuth(data: cs.auth) authResp {
         },
     };
 
-    const character1 = sub_packets.Character{
+    const character1 = cs.structs.Character{
         .job = "test",
         .level = 1,
         .active = true,
@@ -70,7 +69,7 @@ fn reactAuth(data: cs.auth) authResp {
         },
     };
 
-    const character2 = sub_packets.Character{
+    const character2 = cs.structs.Character{
         .job = "test",
         .level = 1,
         .active = true,
@@ -83,18 +82,18 @@ fn reactAuth(data: cs.auth) authResp {
         },
     };
 
-    const characters_choice = cs.CharactersChoice{
-        .characters = &[_]sub_packets.Character{ character, character1, character2 },
+    const characters_choice = cs.structs.CharactersChoice{
+        .characters = &[_]cs.structs.Character{ character, character1, character2 },
         .character_len = 3,
     };
 
     return authResp{ .characters = characters_choice };
 }
 
-fn reactCreateCharacter(data: cs.createCharacter) authResp {
+fn reactCreateCharacter(data: cs.structs.createCharacter) authResp {
     _ = data; // autofix
 
-    return authResp{};
+    return authResp{ .characters = cs.structs.CharactersChoice{} };
 }
 
 test "reactAuth" {

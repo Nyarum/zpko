@@ -1,11 +1,10 @@
 const std = @import("std");
-const bytes = @import("bytes.zig");
 const xev = @import("xev");
-const cs = @import("character_screen.zig");
-const types = @import("types.zig");
+const auth = @import("auth");
+const cs = @import("character_screen");
 const Allocator = std.mem.Allocator;
-const events = @import("events.zig");
 const lmdb = @import("lmdb");
+const core = @import("import.zig");
 
 const BufferPool = std.heap.MemoryPoolExtra([4096]u8, .{ .alignment = 0 });
 const CompletionPool = std.heap.MemoryPool(xev.Completion);
@@ -24,10 +23,10 @@ pub const Server = struct {
     stop: bool,
     alloc: Allocator,
     db: lmdb.Environment,
-    ev: events,
+    ev: core.events,
 
     pub fn init(alloc: Allocator, loop: *xev.Loop, db: lmdb.Environment) !Server {
-        return .{ .loop = loop, .buffer_pool = BufferPool.init(alloc), .completion_pool = CompletionPool.init(alloc), .socket_pool = TCPPool.init(alloc), .stop = false, .alloc = alloc, .db = db, .ev = events{
+        return .{ .loop = loop, .buffer_pool = BufferPool.init(alloc), .completion_pool = CompletionPool.init(alloc), .socket_pool = TCPPool.init(alloc), .stop = false, .alloc = alloc, .db = db, .ev = core.events{
             .db = db,
         } };
     }
@@ -82,13 +81,13 @@ pub const Server = struct {
 
         const w_c = self.completion_pool.create() catch unreachable;
 
-        const datePkt = cs.firstDate.init(self.alloc) catch |err| {
+        const datePkt = auth.structs.firstDate.init(self.alloc) catch |err| {
             std.debug.print("can't init firstDate {any}", .{err});
             return .rearm;
         };
         //defer self.alloc.free(datePkt.date.value);
 
-        const first_date = bytes.packHeaderBytes(self.alloc, datePkt);
+        const first_date = core.bytes.packHeaderBytes(self.alloc, datePkt);
 
         std.debug.print("Send buf: {any}\n", .{std.fmt.fmtSliceHexUpper(first_date)});
 
@@ -133,8 +132,8 @@ pub const Server = struct {
 
         std.debug.print("Read buf: {any}\n", .{std.fmt.fmtSliceHexUpper(buf.slice[0..n])});
 
-        const header = bytes.unpackHeaderBytes(buf.slice[0..n]);
-        const res = events.react(self.alloc, header.opcode, header.body);
+        const header = core.bytes.unpackHeaderBytes(buf.slice[0..n]);
+        const res = core.events.react(self.alloc, header.opcode, header.body);
 
         if (res == null) {
             self.destroyBuf(buf.slice);

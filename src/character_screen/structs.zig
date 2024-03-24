@@ -1,5 +1,5 @@
 const std = @import("std");
-const custom_types = @import("../types.zig");
+const core = @import("core");
 
 pub const InstAttr = struct {
     id: u16 = 0,
@@ -41,7 +41,7 @@ pub const Character = struct {
 pub const CharactersChoice = struct {
     opcode: u16 = 931,
     error_code: u16 = 0,
-    key: custom_types.bytes = custom_types.bytes{ .value = &[_]u8{ 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49 } },
+    key: core.types.bytes = core.types.bytes{ .value = &[_]u8{ 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49 } },
     character_len: u8 = 0,
     characters: []const Character = &[_]Character{},
     pincode: u8 = 1,

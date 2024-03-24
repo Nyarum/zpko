@@ -24,9 +24,18 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const xev_module = b.dependency("xev", .{}).module("xev");
-    const character_screen_module = b.createModule(.{
-        .root_source_file = LazyPath.relative("src/character_screen/import.zig"),
+    const core_module = b.createModule(.{ .root_source_file = LazyPath.relative("src/import.zig"), .imports = &.{ .{ .name = "xev", .module = xev_module }, .{ .name = "lmdb", .module = lmdb } } });
+
+    const auth_module = b.createModule(.{
+        .root_source_file = LazyPath.relative("src/auth/import.zig"),
     });
+    core_module.addImport("auth", auth_module);
+    auth_module.addImport("core", core_module);
+
+    const character_screen_module = b.createModule(.{ .root_source_file = LazyPath.relative("src/character_screen/import.zig"), .imports = &.{
+        .{ .name = "core", .module = core_module },
+    } });
+    core_module.addImport("character_screen", character_screen_module);
 
     const bytes_module = b.createModule(.{ .root_source_file = LazyPath.relative("src/bytes.zig"), .imports = &.{
         .{ .name = "character_screen", .module = character_screen_module },
@@ -43,6 +52,10 @@ pub fn build(b: *std.Build) !void {
 
     exe.root_module.addImport("xev", xev_module);
     exe.root_module.addImport("lmdb", lmdb);
+    exe.root_module.addImport("bytes", bytes_module);
+    exe.root_module.addImport("core", core_module);
+    exe.root_module.addImport("auth", auth_module);
+    exe.root_module.addImport("character_screen", character_screen_module);
 
     const pretty = b.dependency("pretty", .{ .target = target, .optimize = optimize });
     exe.root_module.addImport("pretty", pretty.module("pretty"));

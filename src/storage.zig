@@ -1,7 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const cs = @import("./character_screen.zig");
-const sub_packets = @import("sub_packets.zig");
+const cs = @import("character_screen");
 
 const allocator = std.heap.page_allocator;
 var users = std.AutoHashMap(u32, std.ArrayList(u8)).init(allocator);
@@ -31,12 +30,12 @@ pub fn getUser(id: u32) ?cs.Character {
 }
 
 test "try save user" {
-    try saveUser(sub_packets.Character{
+    try saveUser(cs.structs.Character{
         .active = true,
         .job = "Warrior",
         .level = 1,
         .name = "test",
-        .look = sub_packets.Look{ .hair = 0, .item_grids = undefined, .type_id = 0, .ver = 0 },
+        .look = cs.structs.Look{ .hair = 0, .item_grids = undefined, .type_id = 0, .ver = 0 },
     });
 
     if (getUser(1)) |v| {

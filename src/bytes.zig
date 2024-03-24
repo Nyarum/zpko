@@ -1,6 +1,6 @@
 const std = @import("std");
 const print = std.debug.print;
-const custom_types = @import("types.zig");
+const core = @import("import.zig");
 const character_screen = @import("character_screen");
 const Allocator = std.mem.Allocator;
 
@@ -154,13 +154,13 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                 std.mem.copyForwards(u8, buf[finalOffset..], "\x00");
                 finalOffset = finalOffset + 1;
             },
-            custom_types.plain_string => {
+            core.types.plain_string => {
                 const v2 = @field(v, field.name);
                 const value = v2.value;
                 @memcpy(buf[finalOffset .. finalOffset + value.len], value[0..value.len]);
                 finalOffset = finalOffset + @as(u8, @intCast(value.len));
             },
-            custom_types.bytes => {
+            core.types.bytes => {
                 const v2 = @field(v, field.name).value;
 
                 var buf2: [2]u8 = undefined;

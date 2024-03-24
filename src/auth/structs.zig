@@ -1,15 +1,14 @@
 const std = @import("std");
 const print = std.debug.print;
-const timeUtil = @import("time.zig");
 const Allocator = std.mem.Allocator;
-const custom_types = @import("types.zig");
+const core = @import("core");
 
 pub const firstDate = struct {
     opcode: ?u16 = 940,
-    date: custom_types.plain_string,
+    date: core.types.plain_string,
 
     pub fn init(allocator: Allocator) !firstDate {
-        const date = custom_types.plain_string{ .value = try timeUtil.getCurrentTime(allocator) };
+        const date = core.types.plain_string{ .value = try core.time.getCurrentTime(allocator) };
 
         return firstDate{
             .date = date,
