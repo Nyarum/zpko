@@ -54,3 +54,8 @@ pub const createCharacter = struct {
     map: []const u8,
     look: Look,
 };
+
+pub const createCharacterResp = struct {
+    opcode: u16 = 935,
+    error_code: u16 = 0,
+};

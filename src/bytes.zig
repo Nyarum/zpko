@@ -41,6 +41,8 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
         };
 
         if (!isOptional) {
+            std.debug.print("type parse: {any}\n", .{field.type});
+
             switch (field.type) {
                 u8 => {
                     const takeBuf = modBuf[0..1];
@@ -53,6 +55,16 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
                     const v = std.mem.readInt(u16, takeBuf, std.builtin.Endian.big);
                     @field(result, field.name) = v;
                 },
+                bool => {
+                    const takeBuf = modBuf[0..1];
+                    modBuf = modBuf[1..];
+
+                    if (takeBuf[0] == 1) {
+                        @field(result, field.name) = true;
+                    } else {
+                        @field(result, field.name) = false;
+                    }
+                },
                 []const u8 => {
                     const takeBuf = modBuf[0..2];
                     modBuf = modBuf[2..];
@@ -63,10 +75,77 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
                     @field(result, field.name) = str;
                 },
                 character_screen.structs.Look => {
+                    modBuf = modBuf[2..];
+
                     const unpack_struct = unpackBytes(field.type, modBuf);
 
                     @field(result, field.name) = unpack_struct.return_type;
                     modBuf = unpack_struct.buf;
+                },
+                [10]character_screen.structs.ItemGrid => {
+                    std.log.info("test item grid {any}\n", .{field.type});
+
+                    const typeOfArray = std.meta.Elem(field.type);
+
+                    var itemGrids: [10]character_screen.structs.ItemGrid = undefined;
+                    for (0..10) |x| {
+                        const unpack_struct = unpackBytes(typeOfArray, modBuf);
+
+                        itemGrids[x] = unpack_struct.return_type;
+                        modBuf = unpack_struct.buf;
+                    }
+
+                    @field(result, field.name) = itemGrids;
+                },
+                [2]u16 => {
+                    var u16s: [2]u16 = undefined;
+                    for (0..2) |x| {
+                        const takeBuf = modBuf[0..2];
+                        modBuf = modBuf[2..];
+                        const v = std.mem.readInt(u16, takeBuf, std.builtin.Endian.big);
+
+                        u16s[x] = v;
+                    }
+
+                    @field(result, field.name) = u16s;
+                },
+                [2]u32 => {
+                    var u32s: [2]u32 = undefined;
+                    for (0..2) |x| {
+                        const takeBuf = modBuf[0..4];
+                        modBuf = modBuf[4..];
+                        const v = std.mem.readInt(u32, takeBuf, std.builtin.Endian.big);
+
+                        u32s[x] = v;
+                    }
+
+                    @field(result, field.name) = u32s;
+                },
+                [5]character_screen.structs.InstAttr => {
+                    const typeOfArray = std.meta.Elem(field.type);
+
+                    var instAttrs: [5]character_screen.structs.InstAttr = undefined;
+                    for (0..5) |x| {
+                        const unpack_struct = unpackBytes(typeOfArray, modBuf);
+
+                        instAttrs[x] = unpack_struct.return_type;
+                        modBuf = unpack_struct.buf;
+                    }
+
+                    @field(result, field.name) = instAttrs;
+                },
+                [40]character_screen.structs.ItemAttr => {
+                    const typeOfArray = std.meta.Elem(field.type);
+
+                    var itemAttrs: [40]character_screen.structs.ItemAttr = undefined;
+                    for (0..40) |x| {
+                        const unpack_struct = unpackBytes(typeOfArray, modBuf);
+
+                        itemAttrs[x] = unpack_struct.return_type;
+                        modBuf = unpack_struct.buf;
+                    }
+
+                    @field(result, field.name) = itemAttrs;
                 },
                 else => {
                     std.log.info("I don't know", .{});
@@ -247,13 +326,9 @@ pub fn packHeaderBytes(allocator: Allocator, v: anytype) []u8 {
     var lenBuf: [6]u8 = std.mem.zeroes([6]u8);
     const len = buf.len;
 
-    std.debug.print("before: {x:0>2}", .{std.fmt.fmtSliceHexUpper(buf)});
-
     std.mem.writeInt(u16, lenBuf[0..2], @as(u16, @intCast(len)), std.builtin.Endian.big);
     std.mem.writeInt(u32, lenBuf[2..6], 0x80, std.builtin.Endian.little);
     std.mem.copyBackwards(u8, buf[0..6], lenBuf[0..6]);
-
-    std.debug.print("after: {x:0>2}", .{std.fmt.fmtSliceHexUpper(buf)});
 
     return buf;
 }

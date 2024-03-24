@@ -21,11 +21,15 @@ pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]con
             return null;
         },
         435 => { // create character
+            const createCharUnpack = core.bytes.unpackBytes(cs.structs.createCharacter, data);
+
             const res = reactCreateCharacter(
-                core.bytes.unpackBytes(cs.structs.createCharacter, data).return_type,
+                createCharUnpack.return_type,
             );
 
-            const buf = core.bytes.packHeaderBytes(allocator, res.characters);
+            std.debug.print("create character: len({any}) {any}\n", .{ createCharUnpack.buf, createCharUnpack.return_type });
+
+            const buf = core.bytes.packHeaderBytes(allocator, res);
 
             return buf;
         },
@@ -69,31 +73,18 @@ fn reactAuth(data: auth.structs.auth) authResp {
         },
     };
 
-    const character2 = cs.structs.Character{
-        .job = "test",
-        .level = 1,
-        .active = true,
-        .name = "test23",
-        .look = .{
-            .ver = 0,
-            .type_id = 512,
-            .hair = 3592,
-            .item_grids = undefined,
-        },
-    };
-
     const characters_choice = cs.structs.CharactersChoice{
-        .characters = &[_]cs.structs.Character{ character, character1, character2 },
-        .character_len = 3,
+        .characters = &[_]cs.structs.Character{ character, character1 },
+        .character_len = 2,
     };
 
     return authResp{ .characters = characters_choice };
 }
 
-fn reactCreateCharacter(data: cs.structs.createCharacter) authResp {
+fn reactCreateCharacter(data: cs.structs.createCharacter) cs.structs.createCharacterResp {
     _ = data; // autofix
 
-    return authResp{ .characters = cs.structs.CharactersChoice{} };
+    return cs.structs.createCharacterResp{};
 }
 
 test "reactAuth" {
