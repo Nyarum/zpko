@@ -15,7 +15,7 @@
 
 ### [Community]
 - Telegram [https://t.me/+bXCW6H2lUPAyZWIy] [Russian language]
-- Telegram [https://t.me/+8nCAuHpem7sxNzJi] [English language]
+- Telegram [https://t.me/+5OMBkSPIEyw2NDNi] [English language]
 
 ### [Thanks]
 - pkodev.net (sources of client and server the game)
