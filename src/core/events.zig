@@ -23,7 +23,7 @@ pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]con
         435 => { // create character
             const createCharUnpack = core.bytes.unpackBytes(cs.structs.createCharacter, data);
 
-            const res = reactCreateCharacter(
+            const res = cs.events.reactCreateCharacter(
                 createCharUnpack.return_type,
             );
 
@@ -79,12 +79,6 @@ fn reactAuth(data: auth.structs.auth) authResp {
     };
 
     return authResp{ .characters = characters_choice };
-}
-
-fn reactCreateCharacter(data: cs.structs.createCharacter) cs.structs.createCharacterResp {
-    _ = data; // autofix
-
-    return cs.structs.createCharacterResp{};
 }
 
 test "reactAuth" {

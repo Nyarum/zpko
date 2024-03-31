@@ -24,7 +24,8 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const xev_module = b.dependency("xev", .{}).module("xev");
-    const core_module = b.createModule(.{ .root_source_file = LazyPath.relative("src/import.zig"), .imports = &.{ .{ .name = "xev", .module = xev_module }, .{ .name = "lmdb", .module = lmdb } } });
+
+    const core_module = b.createModule(.{ .root_source_file = LazyPath.relative("src/core/import.zig"), .imports = &.{ .{ .name = "xev", .module = xev_module }, .{ .name = "lmdb", .module = lmdb } } });
 
     const auth_module = b.createModule(.{
         .root_source_file = LazyPath.relative("src/auth/import.zig"),
@@ -37,10 +38,6 @@ pub fn build(b: *std.Build) !void {
     } });
     core_module.addImport("character_screen", character_screen_module);
 
-    const bytes_module = b.createModule(.{ .root_source_file = LazyPath.relative("src/bytes.zig"), .imports = &.{
-        .{ .name = "character_screen", .module = character_screen_module },
-    } });
-
     const exe = b.addExecutable(.{
         .name = "zpko",
         // In this case the main source file is merely a path, however, in more
@@ -52,7 +49,6 @@ pub fn build(b: *std.Build) !void {
 
     exe.root_module.addImport("xev", xev_module);
     exe.root_module.addImport("lmdb", lmdb);
-    exe.root_module.addImport("bytes", bytes_module);
     exe.root_module.addImport("core", core_module);
     exe.root_module.addImport("auth", auth_module);
     exe.root_module.addImport("character_screen", character_screen_module);
@@ -99,8 +95,8 @@ pub fn build(b: *std.Build) !void {
 
     unit_tests_characters_screen.root_module.addImport("pretty", pretty.module("pretty"));
     unit_tests_characters_screen.root_module.addImport("lmdb", lmdb);
-    unit_tests_characters_screen.root_module.addImport("bytes", bytes_module);
     unit_tests_characters_screen.root_module.addImport("character_screen", character_screen_module);
+    unit_tests_characters_screen.root_module.addImport("core", core_module);
 
     const run_unit_tests_c = b.addRunArtifact(unit_tests_characters_screen);
 
@@ -109,4 +105,18 @@ pub fn build(b: *std.Build) !void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_unit_tests_c.step);
+
+    const unit_tests_core = b.addTest(.{
+        .root_source_file = .{ .path = "src/core/tests.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    unit_tests_core.root_module.addImport("character_screen", character_screen_module);
+    unit_tests_core.root_module.addImport("core", core_module);
+
+    const run_unit_tests_core = b.addRunArtifact(unit_tests_core);
+
+    const test_step_core = b.step("test_core", "Run unit tests for storage");
+    test_step_core.dependOn(&run_unit_tests_core.step);
 }
