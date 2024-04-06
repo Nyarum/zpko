@@ -37,6 +37,7 @@ pub fn build(b: *std.Build) !void {
         .{ .name = "core", .module = core_module },
     } });
     core_module.addImport("character_screen", character_screen_module);
+    auth_module.addImport("character_screen", character_screen_module);
 
     const exe = b.addExecutable(.{
         .name = "zpko",

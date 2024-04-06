@@ -3,17 +3,47 @@ const auth = @import("auth");
 const cs = @import("character_screen");
 const core = @import("import.zig");
 const lmdb = @import("lmdb");
+const Allocator = std.mem.Allocator;
 
-db: lmdb.Environment = undefined,
+storage: *core.storage = undefined,
+state: State = undefined,
+authEvents: auth.events = undefined,
+csEvents: cs.events = undefined,
+allocator: Allocator = undefined,
 
-pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]const u8 {
+pub const State = struct {
+    login: []u8 = undefined,
+};
+
+pub fn react(self: *@This(), opcode: u16, data: []const u8) !?[]const u8 {
+    std.log.info("\n lastasdadas check: {any}", .{self.storage.users.count()});
+
+    std.log.info("get user: {any}", .{
+        self.storage.getUser(core.storage.UserLogin{
+            .value = &[_]u8{ 97, 115, 100, 97, 115, 100, 0 },
+        }),
+    });
+
+    std.log.info("state ptr: {any}", .{self.state});
     switch (opcode) {
         431 => { // auth
-            const res = reactAuth(
+            const res = try self.authEvents.reactAuth(
                 core.bytes.unpackBytes(auth.structs.auth, data).return_type,
             );
 
-            const buf = core.bytes.packHeaderBytes(allocator, res.characters);
+            //defer self.allocator.free(res.characters.characters);
+
+            self.state.login = self.allocator.alloc(u8, res.login.len) catch unreachable;
+            for (res.login, 0..res.login.len) |char, index| {
+                self.state.login[index] = char;
+            }
+
+            std.log.info("save state login {any}", .{self.state.login});
+            std.log.info("\n last 2222check: {any}", .{self.storage.users.count()});
+
+            const buf = core.bytes.packHeaderBytes(self.allocator, res.characters);
+
+            std.log.info("test", .{});
 
             return buf;
         },
@@ -23,13 +53,16 @@ pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]con
         435 => { // create character
             const createCharUnpack = core.bytes.unpackBytes(cs.structs.createCharacter, data);
 
-            const res = cs.events.reactCreateCharacter(
+            std.log.info("login {any}", .{self.state.login});
+
+            const res = try self.csEvents.reactCreateCharacter(
+                self.state.login,
                 createCharUnpack.return_type,
             );
 
             std.debug.print("create character: len({any}) {any}\n", .{ createCharUnpack.buf, createCharUnpack.return_type });
 
-            const buf = core.bytes.packHeaderBytes(allocator, res);
+            const buf = core.bytes.packHeaderBytes(self.allocator, res);
 
             return buf;
         },
@@ -39,46 +72,6 @@ pub fn react(allocator: std.mem.Allocator, opcode: u16, data: []const u8) ?[]con
     }
 
     return "t";
-}
-
-const authResp = union {
-    characters: cs.structs.CharactersChoice,
-};
-
-fn reactAuth(data: auth.structs.auth) authResp {
-    _ = data; // autofix
-    const character = cs.structs.Character{
-        .job = "test",
-        .level = 1,
-        .active = true,
-        .name = "test",
-        .look = .{
-            .ver = 0,
-            .type_id = 512,
-            .hair = 3592,
-            .item_grids = undefined,
-        },
-    };
-
-    const character1 = cs.structs.Character{
-        .job = "test",
-        .level = 1,
-        .active = true,
-        .name = "test222",
-        .look = .{
-            .ver = 0,
-            .type_id = 512,
-            .hair = 3592,
-            .item_grids = undefined,
-        },
-    };
-
-    const characters_choice = cs.structs.CharactersChoice{
-        .characters = &[_]cs.structs.Character{ character, character1 },
-        .character_len = 2,
-    };
-
-    return authResp{ .characters = characters_choice };
 }
 
 test "reactAuth" {

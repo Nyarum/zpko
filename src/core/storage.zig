@@ -3,6 +3,10 @@ const Allocator = std.mem.Allocator;
 const cs = @import("character_screen");
 const core = @import("core");
 const Endian = std.builtin.Endian;
+const lmdb = @import("lmdb");
+
+db: lmdb.Environment = undefined,
+users: std.HashMap(UserLogin, User, UserLoginContext, 50),
 
 pub const UUID = struct {
     uuid: []const u8,
@@ -53,34 +57,29 @@ pub const UserLoginContext = struct {
         var h = std.hash.Fnv1a_64.init();
         h.update(k.value);
 
+        std.log.info("hash value: {any}", .{h.final()});
+
         return h.final();
     }
 
     pub fn eql(_: UserLoginContext, a: UserLogin, b: UserLogin) bool {
+        std.log.info("eql {s} and {s}", .{ a.value, b.value });
+
         return std.mem.eql(u8, a.value, b.value);
     }
 };
 
 pub const UserReq = struct {
     login: UserLogin,
-    character: cs.structs.Character,
 };
 
 pub const User = struct {
     uuid: UUID,
     login: UserLogin,
-    character: cs.structs.Character,
+    characters: std.ArrayList(Character),
 };
 
-const allocator = std.heap.page_allocator;
-var users = std.HashMap(UserLogin, User, UserLoginContext, 10).init(allocator);
-
-const SaveUserResp = struct {
-    uuid: []u8,
-    character: cs.structs.Character,
-};
-
-pub fn saveUser(v: UserReq) !UUID {
+pub fn saveUser(self: *@This(), v: UserReq) !UUID {
     const uuid = generateUUID() catch |err| {
         // Handle the error here
         std.debug.print("Error generating UUID: {}\n", .{err});
@@ -90,35 +89,48 @@ pub fn saveUser(v: UserReq) !UUID {
     const user = User{
         .uuid = uuid,
         .login = v.login,
-        .character = v.character,
+        .characters = undefined,
     };
 
-    users.put(v.login, user) catch |err| {
-        // Handle the error here
-        std.debug.print("Error saving character: {}\n", .{err});
-        return err;
-    };
+    try self.users.put(v.login, user);
+
+    std.log.info("\nlast check2222: {any}", .{self.users.count()});
 
     return uuid;
 }
 
-pub fn saveCharacter(login: UserLogin, v: cs.structs.Character) !void {
-    var user = getUser(login);
+pub const Character = struct {
+    name: []const u8,
+    level: u16,
+    job: []const u8,
+    active: bool,
+    map: []const u8,
+    look: cs.structs.Look,
+};
+
+pub fn saveCharacter(self: *@This(), login: UserLogin, v: Character) !void {
+    std.log.info("users storage character: {any}", .{login.value});
+
+    var user = self.getUser(login);
     if (user == null) {
         return error.UserNotFound;
     }
 
-    user.?.character = v;
+    try user.?.characters.append(v);
 
-    users.put(login, user.?) catch |err| {
+    self.users.put(login, user.?) catch |err| {
         // Handle the error here
         std.debug.print("Error saving character: {}\n", .{err});
         return err;
     };
 
+    std.log.info("\nlast check2222: {any}", .{self.users});
+
     return;
 }
 
-pub fn getUser(login: UserLogin) ?User {
-    return users.get(login);
+pub fn getUser(self: *@This(), login: UserLogin) ?User {
+    std.log.info("users storage: {any}", .{self.users});
+
+    return self.users.get(login);
 }

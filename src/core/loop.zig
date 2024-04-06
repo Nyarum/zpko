@@ -22,13 +22,25 @@ pub const Server = struct {
     socket_pool: TCPPool,
     stop: bool,
     alloc: Allocator,
-    db: lmdb.Environment,
     ev: core.events,
 
     pub fn init(alloc: Allocator, loop: *xev.Loop, db: lmdb.Environment) !Server {
-        return .{ .loop = loop, .buffer_pool = BufferPool.init(alloc), .completion_pool = CompletionPool.init(alloc), .socket_pool = TCPPool.init(alloc), .stop = false, .alloc = alloc, .db = db, .ev = core.events{
+        const storage = core.storage{
             .db = db,
+            .users = std.HashMap(core.storage.UserLogin, core.storage.User, core.storage.UserLoginContext, 50).init(alloc),
+        };
+
+        const storagePtr = try alloc.create(core.storage);
+        storagePtr.* = storage;
+
+        const ev = core.events{ .storage = storagePtr, .allocator = alloc, .authEvents = auth.events{
+            .storage = storagePtr,
+            .allocator = alloc,
+        }, .csEvents = cs.events{
+            .storage = storagePtr,
         } };
+
+        return .{ .loop = loop, .buffer_pool = BufferPool.init(alloc), .completion_pool = CompletionPool.init(alloc), .socket_pool = TCPPool.init(alloc), .stop = false, .alloc = alloc, .ev = ev };
     }
 
     pub fn deinit(self: *Server) void {
@@ -133,7 +145,12 @@ pub const Server = struct {
         std.debug.print("Read buf: {any}\n", .{std.fmt.fmtSliceHexUpper(buf.slice[0..n])});
 
         const header = core.bytes.unpackHeaderBytes(buf.slice[0..n]);
-        const res = core.events.react(self.alloc, header.opcode, header.body);
+
+        const res = self.ev.react(header.opcode, header.body) catch |err| {
+            std.log.err("can't react on message {any}", .{err});
+
+            return .rearm;
+        };
 
         if (res == null) {
             self.destroyBuf(buf.slice);

@@ -41,7 +41,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
         };
 
         if (!isOptional) {
-            std.debug.print("type parse: {any}\n", .{field.type});
+            //std.debug.print("type parse: {any}\n", .{field.type});
 
             switch (field.type) {
                 u8 => {
@@ -162,7 +162,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
     var finalOffset: u16 = 0;
 
     inline for (std.meta.fields(@TypeOf(v))) |field| {
-        //std.debug.print("field: {s} and it type {any}\n", .{ field.name, field.type });
+        std.debug.print("field: {s} and it type {any}\n", .{ field.name, field.type });
 
         switch (field.type) {
             u8 => {
@@ -257,8 +257,10 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                 finalOffset = finalOffset + 2;
             },
-            []const character_screen.structs.Character => {
+            []character_screen.structs.Character => {
                 const c_field = @field(v, field.name);
+
+                std.log.info("c_field: {any}", .{c_field});
 
                 for (c_field) |*char| {
                     const pack_bytes = packBytes(allocator, char.*, i + 1);
@@ -325,6 +327,8 @@ pub fn packHeaderBytes(allocator: Allocator, v: anytype) []u8 {
     var buf = packBytes(allocator, v, 0);
     var lenBuf: [6]u8 = std.mem.zeroes([6]u8);
     const len = buf.len;
+
+    std.log.info("success pack bytes: {any}", .{buf.len});
 
     std.mem.writeInt(u16, lenBuf[0..2], @as(u16, @intCast(len)), std.builtin.Endian.big);
     std.mem.writeInt(u32, lenBuf[2..6], 0x80, std.builtin.Endian.little);

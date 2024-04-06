@@ -8,8 +8,6 @@ pub fn main() !void {
     const env = try lmdb.Environment.init("database", .{});
     defer env.deinit();
 
-    //try database.saveCharacter(env);
-
     var thread_pool = xev.ThreadPool.init(.{});
     defer thread_pool.deinit();
     defer thread_pool.shutdown();
