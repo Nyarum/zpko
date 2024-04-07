@@ -14,7 +14,7 @@ const authResp = struct {
 };
 
 pub fn reactAuth(self: *@This(), data: auth.structs.auth) !authResp {
-    std.log.info("react auth: {any}", .{data});
+    std.log.info("react auth: {s}", .{data.key});
 
     var user = self.storage.getUser(core.storage.UserLogin{
         .value = data.login,
@@ -45,13 +45,15 @@ pub fn reactAuth(self: *@This(), data: auth.structs.auth) !authResp {
         }
     }
 
-    var characters = std.ArrayList(*cs.structs.Character).init(std.heap.page_allocator);
+    var characters = std.ArrayList(*cs.structs.Character).init(self.allocator);
 
     std.log.info("react auth 2: {any}", .{data});
 
     if (getUser.characters != null) {
         for (getUser.characters.?.items) |char| {
             if (char.active) {
+                std.log.info("name: {any}", .{char});
+
                 const character = try self.allocator.create(cs.structs.Character);
                 character.* = cs.structs.Character{
                     .name = char.name,

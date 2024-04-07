@@ -110,12 +110,12 @@ pub fn saveCharacter(self: *@This(), login: UserLogin, v: *Character) !void {
     }
 
     if (user.?.characters == null) {
-        user.?.characters = std.ArrayList(*Character).init(std.heap.page_allocator);
+        user.?.characters = std.ArrayList(*Character).init(self.allocator);
     }
 
     try user.?.characters.?.append(v);
 
-    std.log.info("test3331 {any}", .{self.users});
+    std.log.info("test3331 {s}", .{v.name});
 
     self.users.put(login, user.?) catch |err| {
         // Handle the error here
@@ -123,9 +123,21 @@ pub fn saveCharacter(self: *@This(), login: UserLogin, v: *Character) !void {
         return err;
     };
 
+    std.log.info("get from storage {any}", .{self.users.get(login).?.characters.?.items[0]});
+
     return;
 }
 
 pub fn getUser(self: *@This(), login: UserLogin) ?User {
+    const user = self.users.get(login);
+
+    if (user != null) {
+        if (user.?.characters != null) {
+            for (user.?.characters.?.items, 0..user.?.characters.?.items.len) |char, index| {
+                std.log.info("char 2 {s} index {any}", .{ char.name, index });
+            }
+        }
+    }
+
     return self.users.get(login);
 }
