@@ -16,34 +16,24 @@ pub const State = struct {
 };
 
 pub fn react(self: *@This(), opcode: u16, data: []const u8) !?[]const u8 {
-    std.log.info("\n lastasdadas check: {any}", .{self.storage.users.count()});
-
-    std.log.info("get user: {any}", .{
-        self.storage.getUser(core.storage.UserLogin{
-            .value = &[_]u8{ 97, 115, 100, 97, 115, 100, 0 },
-        }),
-    });
-
-    std.log.info("state ptr: {any}", .{self.state});
     switch (opcode) {
         431 => { // auth
             const res = try self.authEvents.reactAuth(
                 core.bytes.unpackBytes(auth.structs.auth, data).return_type,
             );
 
-            //defer self.allocator.free(res.characters.characters);
+            defer res.charactersArray.deinit();
 
             self.state.login = self.allocator.alloc(u8, res.login.len) catch unreachable;
             for (res.login, 0..res.login.len) |char, index| {
                 self.state.login[index] = char;
             }
 
-            std.log.info("save state login {any}", .{self.state.login});
-            std.log.info("\n last 2222check: {any}", .{self.storage.users.count()});
+            for (res.characters.characters, 0..res.characters.characters.len) |char, index| {
+                std.log.info("char {s} index {any}", .{ char.name, index });
+            }
 
             const buf = core.bytes.packHeaderBytes(self.allocator, res.characters);
-
-            std.log.info("test", .{});
 
             return buf;
         },
@@ -60,7 +50,7 @@ pub fn react(self: *@This(), opcode: u16, data: []const u8) !?[]const u8 {
                 createCharUnpack.return_type,
             );
 
-            std.debug.print("create character: len({any}) {any}\n", .{ createCharUnpack.buf, createCharUnpack.return_type });
+            //std.debug.print("create character: len({any}) {any}\n", .{ createCharUnpack.buf, createCharUnpack.return_type });
 
             const buf = core.bytes.packHeaderBytes(self.allocator, res);
 

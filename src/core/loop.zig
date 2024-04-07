@@ -27,6 +27,7 @@ pub const Server = struct {
     pub fn init(alloc: Allocator, loop: *xev.Loop, db: lmdb.Environment) !Server {
         const storage = core.storage{
             .db = db,
+            .allocator = alloc,
             .users = std.HashMap(core.storage.UserLogin, core.storage.User, core.storage.UserLoginContext, 50).init(alloc),
         };
 
@@ -38,6 +39,7 @@ pub const Server = struct {
             .allocator = alloc,
         }, .csEvents = cs.events{
             .storage = storagePtr,
+            .allocator = alloc,
         } };
 
         return .{ .loop = loop, .buffer_pool = BufferPool.init(alloc), .completion_pool = CompletionPool.init(alloc), .socket_pool = TCPPool.init(alloc), .stop = false, .alloc = alloc, .ev = ev };

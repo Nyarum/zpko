@@ -5,6 +5,7 @@ const core = @import("core");
 const Endian = std.builtin.Endian;
 const lmdb = @import("lmdb");
 
+allocator: Allocator,
 db: lmdb.Environment = undefined,
 users: std.HashMap(UserLogin, User, UserLoginContext, 50),
 
@@ -57,14 +58,10 @@ pub const UserLoginContext = struct {
         var h = std.hash.Fnv1a_64.init();
         h.update(k.value);
 
-        std.log.info("hash value: {any}", .{h.final()});
-
         return h.final();
     }
 
     pub fn eql(_: UserLoginContext, a: UserLogin, b: UserLogin) bool {
-        std.log.info("eql {s} and {s}", .{ a.value, b.value });
-
         return std.mem.eql(u8, a.value, b.value);
     }
 };
@@ -76,7 +73,7 @@ pub const UserReq = struct {
 pub const User = struct {
     uuid: UUID,
     login: UserLogin,
-    characters: std.ArrayList(Character),
+    characters: ?std.ArrayList(*Character),
 };
 
 pub fn saveUser(self: *@This(), v: UserReq) !UUID {
@@ -94,8 +91,6 @@ pub fn saveUser(self: *@This(), v: UserReq) !UUID {
 
     try self.users.put(v.login, user);
 
-    std.log.info("\nlast check2222: {any}", .{self.users.count()});
-
     return uuid;
 }
 
@@ -108,15 +103,19 @@ pub const Character = struct {
     look: cs.structs.Look,
 };
 
-pub fn saveCharacter(self: *@This(), login: UserLogin, v: Character) !void {
-    std.log.info("users storage character: {any}", .{login.value});
-
+pub fn saveCharacter(self: *@This(), login: UserLogin, v: *Character) !void {
     var user = self.getUser(login);
     if (user == null) {
         return error.UserNotFound;
     }
 
-    try user.?.characters.append(v);
+    if (user.?.characters == null) {
+        user.?.characters = std.ArrayList(*Character).init(std.heap.page_allocator);
+    }
+
+    try user.?.characters.?.append(v);
+
+    std.log.info("test3331 {any}", .{self.users});
 
     self.users.put(login, user.?) catch |err| {
         // Handle the error here
@@ -124,13 +123,9 @@ pub fn saveCharacter(self: *@This(), login: UserLogin, v: Character) !void {
         return err;
     };
 
-    std.log.info("\nlast check2222: {any}", .{self.users});
-
     return;
 }
 
 pub fn getUser(self: *@This(), login: UserLogin) ?User {
-    std.log.info("users storage: {any}", .{self.users});
-
     return self.users.get(login);
 }

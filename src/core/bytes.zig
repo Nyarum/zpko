@@ -162,7 +162,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
     var finalOffset: u16 = 0;
 
     inline for (std.meta.fields(@TypeOf(v))) |field| {
-        std.debug.print("field: {s} and it type {any}\n", .{ field.name, field.type });
+        //std.debug.print("field: {s} and it type {any}\n", .{ field.name, field.type });
 
         switch (field.type) {
             u8 => {
@@ -257,12 +257,14 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                 finalOffset = finalOffset + 2;
             },
-            []character_screen.structs.Character => {
+            []*character_screen.structs.Character => {
+                std.log.info("test", .{});
+
                 const c_field = @field(v, field.name);
 
                 std.log.info("c_field: {any}", .{c_field});
 
-                for (c_field) |*char| {
+                for (c_field) |char| {
                     const pack_bytes = packBytes(allocator, char.*, i + 1);
                     std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
                     finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
