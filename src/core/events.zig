@@ -29,10 +29,6 @@ pub fn react(self: *@This(), opcode: u16, data: []const u8) !?[]const u8 {
                 self.state.login[index] = char;
             }
 
-            for (res.characters.characters, 0..res.characters.characters.len) |char, index| {
-                std.log.info("char {s} index {any}", .{ char.name, index });
-            }
-
             const buf = core.bytes.packHeaderBytes(self.allocator, res.characters);
 
             return buf;

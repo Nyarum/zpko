@@ -14,8 +14,6 @@ const authResp = struct {
 };
 
 pub fn reactAuth(self: *@This(), data: auth.structs.auth) !authResp {
-    std.log.info("react auth: {s}", .{data.key});
-
     var user = self.storage.getUser(core.storage.UserLogin{
         .value = data.login,
     });

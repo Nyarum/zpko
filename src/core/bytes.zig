@@ -83,8 +83,6 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
                     modBuf = unpack_struct.buf;
                 },
                 [10]character_screen.structs.ItemGrid => {
-                    std.log.info("test item grid {any}\n", .{field.type});
-
                     const typeOfArray = std.meta.Elem(field.type);
 
                     var itemGrids: [10]character_screen.structs.ItemGrid = undefined;
@@ -258,11 +256,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                 finalOffset = finalOffset + 2;
             },
             []*character_screen.structs.Character => {
-                std.log.info("test", .{});
-
                 const c_field = @field(v, field.name);
-
-                std.log.info("c_field: {any}", .{c_field});
 
                 for (c_field) |char| {
                     const pack_bytes = packBytes(allocator, char.*, i + 1);

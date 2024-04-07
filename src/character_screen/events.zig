@@ -10,8 +10,6 @@ pub fn reactCreateCharacter(self: *@This(), login: []const u8, data: cs.structs.
     const name = try self.allocator.dupe(u8, data.name);
     const map = try self.allocator.dupe(u8, data.map);
 
-    std.log.info("set info char: {s}", .{data.name});
-
     try self.storage.saveCharacter(core.storage.UserLogin{ .value = login }, core.storage.Character{
         .name = name,
         .map = map,
