@@ -10,7 +10,7 @@ allocator: Allocator,
 const authResp = struct {
     login: []const u8,
     characters: cs.structs.CharactersChoice,
-    charactersArray: std.ArrayList(*cs.structs.Character),
+    charactersArray: std.ArrayList(cs.structs.Character),
 };
 
 pub fn reactAuth(self: *@This(), data: auth.structs.auth) !authResp {
@@ -39,31 +39,18 @@ pub fn reactAuth(self: *@This(), data: auth.structs.auth) !authResp {
 
     const getUser = user.?;
 
-    if (getUser.characters != null) {
-        for (getUser.characters.?.items, 0..getUser.characters.?.items.len) |char, index| {
-            std.log.info("char 2 {s} index {any}", .{ char.name, index });
-        }
-    }
-
-    var characters = std.ArrayList(*cs.structs.Character).init(self.allocator);
-
-    std.log.info("react auth 2: {any}", .{data});
+    var characters = std.ArrayList(cs.structs.Character).init(self.allocator);
 
     if (getUser.characters != null) {
         for (getUser.characters.?.items) |char| {
             if (char.active) {
-                std.log.info("name: {any}", .{char});
-
-                const character = try self.allocator.create(cs.structs.Character);
-                character.* = cs.structs.Character{
+                try characters.append(cs.structs.Character{
                     .name = char.name,
                     .look = char.look,
                     .active = char.active,
                     .job = char.job,
                     .level = char.level,
-                };
-
-                try characters.append(character);
+                });
             }
         }
     }

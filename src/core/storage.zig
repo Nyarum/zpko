@@ -73,7 +73,7 @@ pub const UserReq = struct {
 pub const User = struct {
     uuid: UUID,
     login: UserLogin,
-    characters: ?std.ArrayList(*Character),
+    characters: ?std.ArrayList(Character),
 };
 
 pub fn saveUser(self: *@This(), v: UserReq) !UUID {
@@ -103,14 +103,14 @@ pub const Character = struct {
     look: cs.structs.Look,
 };
 
-pub fn saveCharacter(self: *@This(), login: UserLogin, v: *Character) !void {
+pub fn saveCharacter(self: *@This(), login: UserLogin, v: Character) !void {
     var user = self.getUser(login);
     if (user == null) {
         return error.UserNotFound;
     }
 
     if (user.?.characters == null) {
-        user.?.characters = std.ArrayList(*Character).init(self.allocator);
+        user.?.characters = std.ArrayList(Character).init(self.allocator);
     }
 
     try user.?.characters.?.append(v);

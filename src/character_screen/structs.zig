@@ -43,7 +43,7 @@ pub const CharactersChoice = struct {
     error_code: u16 = 0,
     key: core.types.bytes = core.types.bytes{ .value = &[_]u8{ 0x7C, 0x35, 0x09, 0x19, 0xB2, 0x50, 0xD3, 0x49 } },
     character_len: u8 = 0,
-    characters: []*Character = undefined,
+    characters: []Character = undefined,
     pincode: u8 = 1,
     encryption: u32 = 0,
     dw_flag: u32 = 12820,
