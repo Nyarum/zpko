@@ -305,7 +305,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16, comptime endian: std.
                 }
             },
             else => {
-                std.debug.print("not found handle for the type {any}\n", .{@typeInfo(field.type)});
+                std.debug.print("not found handle for the type {any}\n", .{field.type});
             },
         }
     }
