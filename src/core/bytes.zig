@@ -162,6 +162,14 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16, comptime endian: std.
     inline for (std.meta.fields(@TypeOf(v))) |field| {
         //std.debug.print("field: {s} and it type {any}\n", .{ field.name, field.type });
 
+        if (std.meta.hasMethod(field.type, "filter")) {
+            const v2 = @field(v, field.name);
+
+            if (!v2.filter()) {
+                continue;
+            }
+        }
+
         switch (field.type) {
             u8 => {
                 var buf2: [1]u8 = undefined;

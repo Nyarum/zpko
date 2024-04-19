@@ -177,6 +177,12 @@ pub const CharacterLookItem = struct {
     dbParams: [2]u32,
     isInstAttrs: u8,
     instAttrs: [5]InstAttr,
+
+    fn filter(item: CharacterLookItem) bool {
+        if (item.id == 0) {
+            return false;
+        }
+    }
 };
 
 pub const CharacterLookHuman = struct {
