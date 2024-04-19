@@ -15,9 +15,9 @@ pub const State = struct {
     login: []u8 = undefined,
 };
 
-pub fn react(self: *@This(), opcode: u16, data: []const u8) !?[]const u8 {
+pub fn react(self: *@This(), opcode: core.opcodes.Opcode, data: []const u8) !?[]const u8 {
     switch (opcode) {
-        431 => { // auth
+        core.opcodes.Opcode.Auth => {
             const res = try self.authEvents.reactAuth(
                 core.bytes.unpackBytes(auth.structs.auth, data).return_type,
             );
@@ -33,10 +33,10 @@ pub fn react(self: *@This(), opcode: u16, data: []const u8) !?[]const u8 {
 
             return buf;
         },
-        432 => { // exit
+        core.opcodes.Opcode.Exit => {
             return null;
         },
-        435 => { // create character
+        core.opcodes.Opcode.CreateCharacter => {
             const createCharUnpack = core.bytes.unpackBytes(cs.structs.createCharacter, data);
 
             std.log.info("login {any}", .{self.state.login});
@@ -52,12 +52,23 @@ pub fn react(self: *@This(), opcode: u16, data: []const u8) !?[]const u8 {
 
             return buf;
         },
-        else => {
-            std.debug.print("no way, opcode {any}\n", .{opcode});
+        core.opcodes.Opcode.EnterWorld => {
+            const enterWorldUnpack = core.bytes.unpackBytes(cs.structs.enterGameRequest, data);
+
+            const res = try self.csEvents.reactEnterWorld(
+                self.state.login,
+                enterWorldUnpack.return_type,
+            );
+
+            const buf = core.bytes.packHeaderBytes(self.allocator, res);
+
+            return buf;
         },
     }
 
-    return "t";
+    std.debug.print("no way, opcode {any}\n", .{opcode});
+
+    return null;
 }
 
 test "reactAuth" {

@@ -6,3 +6,4 @@ pub const loop = @import("loop.zig");
 pub const storage = @import("storage.zig");
 pub const time = @import("time.zig");
 pub const enums = @import("enums.zig");
+pub const opcodes = @import("opcodes.zig");

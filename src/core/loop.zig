@@ -148,7 +148,7 @@ pub const Server = struct {
 
         const header = core.bytes.unpackHeaderBytes(buf.slice[0..n]);
 
-        const res = self.ev.react(header.opcode, header.body) catch |err| {
+        const res = self.ev.react(@enumFromInt(header.opcode), header.body) catch |err| {
             std.log.err("can't react on message {any}", .{err});
 
             return .rearm;

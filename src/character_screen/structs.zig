@@ -254,3 +254,7 @@ pub const EnterGame = struct {
     characterBoats: []CharacterBoat,
     chaMainId: u32,
 };
+
+pub const enterGameRequest = struct {
+    characterName: []const u8,
+};
