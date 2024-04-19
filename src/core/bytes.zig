@@ -30,7 +30,7 @@ fn unpack_return_func(comptime T: type) type {
     };
 }
 
-pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
+pub fn unpackBytes(comptime T: type, bytes: []const u8, comptime endian: std.builtin.Endian) unpack_return_func(T) {
     var result: T = undefined;
     var modBuf = bytes;
     const fields = std.meta.fields(T);
@@ -52,7 +52,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
                 u16 => {
                     const takeBuf = modBuf[0..2];
                     modBuf = modBuf[2..];
-                    const v = std.mem.readInt(u16, takeBuf, std.builtin.Endian.big);
+                    const v = std.mem.readInt(u16, takeBuf, endian);
                     @field(result, field.name) = v;
                 },
                 bool => {
@@ -68,7 +68,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
                 []const u8 => {
                     const takeBuf = modBuf[0..2];
                     modBuf = modBuf[2..];
-                    const lnStr = std.mem.readInt(u16, takeBuf, std.builtin.Endian.big);
+                    const lnStr = std.mem.readInt(u16, takeBuf, endian);
 
                     const str = modBuf[0..lnStr];
                     modBuf = modBuf[lnStr..];
@@ -77,7 +77,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
                 character_screen.structs.Look => {
                     modBuf = modBuf[2..];
 
-                    const unpack_struct = unpackBytes(field.type, modBuf);
+                    const unpack_struct = unpackBytes(field.type, modBuf, std.builtin.Endian.little);
 
                     @field(result, field.name) = unpack_struct.return_type;
                     modBuf = unpack_struct.buf;
@@ -87,7 +87,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
 
                     var itemGrids: [10]character_screen.structs.ItemGrid = undefined;
                     for (0..10) |x| {
-                        const unpack_struct = unpackBytes(typeOfArray, modBuf);
+                        const unpack_struct = unpackBytes(typeOfArray, modBuf, endian);
 
                         itemGrids[x] = unpack_struct.return_type;
                         modBuf = unpack_struct.buf;
@@ -100,7 +100,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
                     for (0..2) |x| {
                         const takeBuf = modBuf[0..2];
                         modBuf = modBuf[2..];
-                        const v = std.mem.readInt(u16, takeBuf, std.builtin.Endian.big);
+                        const v = std.mem.readInt(u16, takeBuf, endian);
 
                         u16s[x] = v;
                     }
@@ -112,7 +112,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
                     for (0..2) |x| {
                         const takeBuf = modBuf[0..4];
                         modBuf = modBuf[4..];
-                        const v = std.mem.readInt(u32, takeBuf, std.builtin.Endian.big);
+                        const v = std.mem.readInt(u32, takeBuf, endian);
 
                         u32s[x] = v;
                     }
@@ -124,7 +124,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
 
                     var instAttrs: [5]character_screen.structs.InstAttr = undefined;
                     for (0..5) |x| {
-                        const unpack_struct = unpackBytes(typeOfArray, modBuf);
+                        const unpack_struct = unpackBytes(typeOfArray, modBuf, endian);
 
                         instAttrs[x] = unpack_struct.return_type;
                         modBuf = unpack_struct.buf;
@@ -137,7 +137,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
 
                     var itemAttrs: [40]character_screen.structs.ItemAttr = undefined;
                     for (0..40) |x| {
-                        const unpack_struct = unpackBytes(typeOfArray, modBuf);
+                        const unpack_struct = unpackBytes(typeOfArray, modBuf, endian);
 
                         itemAttrs[x] = unpack_struct.return_type;
                         modBuf = unpack_struct.buf;
@@ -155,7 +155,7 @@ pub fn unpackBytes(comptime T: type, bytes: []const u8) unpack_return_func(T) {
     return unpack_return_func(T).init(result, modBuf);
 }
 
-pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
+pub fn packBytes(allocator: Allocator, v: anytype, i: u16, comptime endian: std.builtin.Endian) []u8 {
     var buf: [default_buf_size]u8 = undefined;
     var finalOffset: u16 = 0;
 
@@ -166,7 +166,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
             u8 => {
                 var buf2: [1]u8 = undefined;
                 const v2 = @field(v, field.name);
-                std.mem.writeInt(u8, &buf2, v2, std.builtin.Endian.big);
+                std.mem.writeInt(u8, &buf2, v2, endian);
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 1], buf2[0..]);
                 finalOffset = finalOffset + 1;
             },
@@ -175,9 +175,9 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                 const v2 = @field(v, field.name);
 
                 if (v2) {
-                    std.mem.writeInt(u8, &buf2, 1, std.builtin.Endian.big);
+                    std.mem.writeInt(u8, &buf2, 1, endian);
                 } else {
-                    std.mem.writeInt(u8, &buf2, 0, std.builtin.Endian.big);
+                    std.mem.writeInt(u8, &buf2, 0, endian);
                 }
 
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 1], buf2[0..]);
@@ -188,7 +188,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
 
                 for (vs) |internal_v| {
                     var buf2: [2]u8 = undefined;
-                    std.mem.writeInt(u16, &buf2, internal_v, std.builtin.Endian.big);
+                    std.mem.writeInt(u16, &buf2, internal_v, endian);
                     std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                     finalOffset = finalOffset + 2;
                 }
@@ -198,7 +198,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
 
                 for (vs) |internal_v| {
                     var buf2: [4]u8 = undefined;
-                    std.mem.writeInt(u32, &buf2, internal_v, std.builtin.Endian.big);
+                    std.mem.writeInt(u32, &buf2, internal_v, endian);
                     std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 4], buf2[0..]);
                     finalOffset = finalOffset + 4;
                 }
@@ -206,14 +206,14 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
             u16 => {
                 const v2 = @field(v, field.name);
                 var buf2: [2]u8 = undefined;
-                std.mem.writeInt(u16, &buf2, v2, std.builtin.Endian.big);
+                std.mem.writeInt(u16, &buf2, v2, endian);
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                 finalOffset = finalOffset + 2;
             },
             u32 => {
                 const v2 = @field(v, field.name);
                 var buf2: [4]u8 = undefined;
-                std.mem.writeInt(u32, &buf2, v2, std.builtin.Endian.big);
+                std.mem.writeInt(u32, &buf2, v2, endian);
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 4], buf2[0..]);
                 finalOffset = finalOffset + 4;
             },
@@ -221,7 +221,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                 const v2 = @field(v, field.name);
 
                 var buf2: [2]u8 = undefined;
-                std.mem.writeInt(u16, &buf2, @as(u16, @intCast(v2.len + 1)), std.builtin.Endian.big);
+                std.mem.writeInt(u16, &buf2, @as(u16, @intCast(v2.len + 1)), endian);
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                 finalOffset = finalOffset + 2;
 
@@ -241,7 +241,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                 const v2 = @field(v, field.name).value;
 
                 var buf2: [2]u8 = undefined;
-                std.mem.writeInt(u16, &buf2, @as(u16, @intCast(v2.len)), std.builtin.Endian.big);
+                std.mem.writeInt(u16, &buf2, @as(u16, @intCast(v2.len)), endian);
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                 finalOffset = finalOffset + 2;
 
@@ -251,7 +251,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
             ?u16 => {
                 const v2 = @field(v, field.name).?;
                 var buf2: [2]u8 = undefined;
-                std.mem.writeInt(u16, &buf2, v2, std.builtin.Endian.big);
+                std.mem.writeInt(u16, &buf2, v2, endian);
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                 finalOffset = finalOffset + 2;
             },
@@ -268,7 +268,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
                 const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1);
 
                 var buf2: [2]u8 = undefined;
-                std.mem.writeInt(u16, &buf2, @as(u16, @intCast(pack_bytes.len)), std.builtin.Endian.big);
+                std.mem.writeInt(u16, &buf2, @as(u16, @intCast(pack_bytes.len)), std.builtin.Endian.little);
                 std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
                 finalOffset = finalOffset + 2;
 
@@ -320,7 +320,7 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16) []u8 {
 }
 
 pub fn packHeaderBytes(allocator: Allocator, v: anytype) []u8 {
-    var buf = packBytes(allocator, v, 0);
+    var buf = packBytes(allocator, v, 0, std.builtin.Endian.big);
     var lenBuf: [6]u8 = std.mem.zeroes([6]u8);
     const len = buf.len;
 

@@ -19,7 +19,7 @@ pub fn react(self: *@This(), opcode: core.opcodes.Opcode, data: []const u8) !?[]
     switch (opcode) {
         core.opcodes.Opcode.Auth => {
             const res = try self.authEvents.reactAuth(
-                core.bytes.unpackBytes(auth.structs.auth, data).return_type,
+                core.bytes.unpackBytes(auth.structs.auth, data, std.builtin.Endian.big).return_type,
             );
 
             defer res.charactersArray.deinit();
@@ -37,7 +37,7 @@ pub fn react(self: *@This(), opcode: core.opcodes.Opcode, data: []const u8) !?[]
             return null;
         },
         core.opcodes.Opcode.CreateCharacter => {
-            const createCharUnpack = core.bytes.unpackBytes(cs.structs.createCharacter, data);
+            const createCharUnpack = core.bytes.unpackBytes(cs.structs.createCharacter, data, std.builtin.Endian.big);
 
             std.log.info("login {any}", .{self.state.login});
 
@@ -46,14 +46,12 @@ pub fn react(self: *@This(), opcode: core.opcodes.Opcode, data: []const u8) !?[]
                 createCharUnpack.return_type,
             );
 
-            //std.debug.print("create character: len({any}) {any}\n", .{ createCharUnpack.buf, createCharUnpack.return_type });
-
             const buf = core.bytes.packHeaderBytes(self.allocator, res);
 
             return buf;
         },
         core.opcodes.Opcode.EnterWorld => {
-            const enterWorldUnpack = core.bytes.unpackBytes(cs.structs.enterGameRequest, data);
+            const enterWorldUnpack = core.bytes.unpackBytes(cs.structs.enterGameRequest, data, std.builtin.Endian.big);
 
             const res = try self.csEvents.reactEnterWorld(
                 self.state.login,
