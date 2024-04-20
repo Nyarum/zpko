@@ -65,30 +65,15 @@ pub const CharacterBoat = struct {
     characterAttribute: CharacterAttribute,
     characterKitbag: CharacterKitbag,
     characterSkillState: CharacterSkillState,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const Shortcut = struct {
     type: u8,
     gridId: u16,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterShortcut = struct {
     shortcuts: [core.enums.Constants.shortCutNum]Shortcut,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const KitbagItem = struct {
@@ -103,63 +88,33 @@ pub const KitbagItem = struct {
     itemDbForge: u32,
     isParams: bool,
     instAttrs: [5]InstAttr,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterKitbag = struct {
     type: u8,
     keybagNum: u16,
     items: [40]KitbagItem,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const Attribute = struct {
     id: u8,
     value: u32,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterAttribute = struct {
     type: u8,
     num: u16,
     attributes: [40]Attribute,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const SkillState = struct {
     id: u8,
     level: u8,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterSkillState = struct {
     statesLen: u8,
     states: [40]SkillState,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterSkill = struct {
@@ -173,10 +128,6 @@ pub const CharacterSkill = struct {
     rangeType: u16,
     params: []u16, // Optional based on use?
 
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterSkillBag = struct {
@@ -184,30 +135,15 @@ pub const CharacterSkillBag = struct {
     type: u8,
     skillNum: u16,
     skills: [40]CharacterSkill,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterAppendLook = struct {
     lookId: u16,
     isValid: u8,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterPK = struct {
     pkCtrl: u8,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterLookBoat = struct {
@@ -218,22 +154,12 @@ pub const CharacterLookBoat = struct {
     engine: u16,
     cannon: u16,
     equipment: u16,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterLookItemSync = struct {
     endure: u16,
     energy: u16,
     isValid: u8,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterLookItemShow = struct {
@@ -242,11 +168,6 @@ pub const CharacterLookItemShow = struct {
     energy: [2]u16,
     forgeLevel: u8,
     isValid: u8,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterLookItem = struct {
@@ -270,11 +191,6 @@ pub const CharacterLookItem = struct {
 pub const CharacterLookHuman = struct {
     hairId: u16,
     itemGrid: [10]CharacterLookItem,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterLook = struct {
@@ -283,11 +199,6 @@ pub const CharacterLook = struct {
     isBoat: u8,
     lookBoat: CharacterLookBoat,
     lookHuman: CharacterLookHuman,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const EntityEvent = struct {
@@ -295,32 +206,16 @@ pub const EntityEvent = struct {
     entityType: u8,
     eventId: u16,
     eventName: []const u8,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-
-        return false;
-    }
 };
 
 pub const CharacterSide = struct {
     sideId: u8,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const Position = struct {
     x: u32,
     y: u32,
     radius: u32,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const CharacterBase = struct {
@@ -347,11 +242,6 @@ pub const CharacterBase = struct {
     look: CharacterLook,
     pkCtrl: CharacterPK,
     lookAppend: [core.enums.Constants.espeKbgridNum]CharacterAppendLook,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const EnterGame = struct {
@@ -372,11 +262,6 @@ pub const EnterGame = struct {
     boatLen: u8,
     characterBoats: [3]CharacterBoat,
     chaMainId: u32,
-
-    pub fn filter(item: @This()) bool {
-        _ = item; // autofix
-        return false;
-    }
 };
 
 pub const enterGameRequest = struct {

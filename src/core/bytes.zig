@@ -165,8 +165,7 @@ fn shouldSkipField(comptime T: type, comptime fieldName: []const u8) bool {
     return false;
 }
 
-pub fn packStructTypes(allocator: Allocator, v: anytype, field: std.builtin.Type.StructField, comptime endian: std.builtin.Endian) []u8 {
-    _ = allocator; // autofix
+pub fn packStructTypes(v: anytype, field: std.builtin.Type.StructField, comptime endian: std.builtin.Endian) []u8 {
     var buf: [default_buf_size]u8 = undefined;
     var finalOffset: u16 = 0;
 
@@ -310,7 +309,7 @@ pub fn packArrayAndStructTypes(allocator: Allocator, v: anytype, field: std.buil
             }
         },
         else => {
-            const pack_bytes = packStructTypes(allocator, v, field, endian);
+            const pack_bytes = packStructTypes(v, field, endian);
             std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
             finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
         },
