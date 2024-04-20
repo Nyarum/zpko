@@ -278,6 +278,19 @@ pub fn packArrayAndStructTypes(allocator: Allocator, v: anytype, field: std.buil
 
     const fieldTypeInfo = @typeInfo(field.type);
 
+    if (field.type == character_screen.structs.Look) {
+        const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1, endian);
+
+        var buf2: [2]u8 = undefined;
+        std.mem.writeInt(u16, &buf2, @as(u16, @intCast(pack_bytes.len)), std.builtin.Endian.little);
+        std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
+        finalOffset = finalOffset + 2;
+
+        std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+        finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
+        return buf[0..finalOffset];
+    }
+
     switch (fieldTypeInfo) {
         .Array => {
             const element_type = fieldTypeInfo.Array.child;
@@ -292,21 +305,9 @@ pub fn packArrayAndStructTypes(allocator: Allocator, v: anytype, field: std.buil
             }
         },
         .Struct => {
-            if (field.type == character_screen.structs.Look) {
-                const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1, endian);
-
-                var buf2: [2]u8 = undefined;
-                std.mem.writeInt(u16, &buf2, @as(u16, @intCast(pack_bytes.len)), std.builtin.Endian.little);
-                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
-                finalOffset = finalOffset + 2;
-
-                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
-                finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
-            } else {
-                const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1, endian);
-                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
-                finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
-            }
+            const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1, endian);
+            std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+            finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
         },
         else => {
             const pack_bytes = packStructTypes(v, field, endian);
