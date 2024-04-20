@@ -4,7 +4,7 @@ const core = @import("import.zig");
 const character_screen = @import("character_screen");
 const Allocator = std.mem.Allocator;
 
-const default_buf_size = 20192;
+const default_buf_size = 64959;
 
 fn isFieldOptional(comptime T: type, field_index: usize) !bool {
     const fields = @typeInfo(T).Struct.fields;
@@ -165,7 +165,8 @@ fn shouldSkipField(comptime T: type, comptime fieldName: []const u8) bool {
     return false;
 }
 
-pub fn packStructTypes(allocator: Allocator, v: anytype, field: std.builtin.Type.StructField, i: u16, comptime endian: std.builtin.Endian) []u8 {
+pub fn packStructTypes(allocator: Allocator, v: anytype, field: std.builtin.Type.StructField, comptime endian: std.builtin.Endian) []u8 {
+    _ = allocator; // autofix
     var buf: [default_buf_size]u8 = undefined;
     var finalOffset: u16 = 0;
 
@@ -264,19 +265,54 @@ pub fn packStructTypes(allocator: Allocator, v: anytype, field: std.builtin.Type
             std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
             finalOffset = finalOffset + 2;
         },
-        character_screen.structs.Look => {
-            const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1, endian);
+        else => {
+            std.debug.print("not found type for handle field.type: {any}\n", .{field.type});
+        },
+    }
 
-            var buf2: [2]u8 = undefined;
-            std.mem.writeInt(u16, &buf2, @as(u16, @intCast(pack_bytes.len)), std.builtin.Endian.little);
-            std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
-            finalOffset = finalOffset + 2;
+    return buf[0..finalOffset];
+}
 
-            std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
-            finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
+pub fn packArrayAndStructTypes(allocator: Allocator, v: anytype, field: std.builtin.Type.StructField, i: u16, comptime endian: std.builtin.Endian) []u8 {
+    var buf: [default_buf_size]u8 = undefined;
+    var finalOffset: u16 = 0;
+
+    const fieldTypeInfo = @typeInfo(field.type);
+
+    switch (fieldTypeInfo) {
+        .Array => {
+            const element_type = fieldTypeInfo.Array.child;
+            if (@typeInfo(element_type) == .Struct) {
+                const items = @field(v, field.name);
+
+                for (items) |ia| {
+                    const pack_bytes = packBytes(allocator, ia, i + 1, endian);
+                    std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+                    finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
+                }
+            }
+        },
+        .Struct => {
+            if (field.type == character_screen.structs.Look) {
+                const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1, endian);
+
+                var buf2: [2]u8 = undefined;
+                std.mem.writeInt(u16, &buf2, @as(u16, @intCast(pack_bytes.len)), std.builtin.Endian.little);
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + 2], buf2[0..]);
+                finalOffset = finalOffset + 2;
+
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+                finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
+            } else {
+                const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1, endian);
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+                finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
+            }
         },
         else => {
-            @panic("not implemented");
+            const pack_bytes = packStructTypes(allocator, v, field, endian);
+            std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+            finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
         },
     }
 
@@ -288,44 +324,16 @@ pub fn packBytes(allocator: Allocator, v: anytype, i: u16, comptime endian: std.
     var finalOffset: u16 = 0;
 
     inline for (std.meta.fields(@TypeOf(v))) |field| {
-        const fieldTypeInfo = @typeInfo(field.type);
-
         if (std.meta.hasMethod(@TypeOf(v), "filter")) {
             if (!v.filter()) {
-                switch (fieldTypeInfo) {
-                    .Array => {
-                        const element_type = fieldTypeInfo.Array.child;
-                        if (@typeInfo(element_type) == .Struct) {
-                            const items = @field(v, field.name);
-
-                            for (items) |ia| {
-                                const pack_bytes = packBytes(allocator, ia, i + 1, endian);
-                                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
-                                finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
-                            }
-                        }
-                    },
-                    .Struct => {
-                        const pack_bytes = packBytes(allocator, @field(v, field.name), i + 1, endian);
-                        std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
-                        finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
-                    },
-                    else => {
-                        const pack_bytes = packStructTypes(allocator, v, field, i, endian);
-                        std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
-                        finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
-
-                        std.debug.print("not found type for handle type info: {any}\n", .{fieldTypeInfo});
-                        std.debug.print("not found type for handle field.type: {any}\n", .{field.type});
-                    },
-                }
+                const pack_bytes = packArrayAndStructTypes(allocator, v, field, i, endian);
+                std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
+                finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
             }
         } else {
-            const pack_bytes = packStructTypes(allocator, v, field, i, endian);
+            const pack_bytes = packArrayAndStructTypes(allocator, v, field, i, endian);
             std.mem.copyForwards(u8, buf[finalOffset .. finalOffset + pack_bytes.len], pack_bytes);
             finalOffset = finalOffset + @as(u16, @intCast(pack_bytes.len));
-
-            std.debug.print("not found filter method {any}\n", .{field.type});
         }
     }
 
